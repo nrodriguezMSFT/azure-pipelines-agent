@@ -19,7 +19,7 @@ namespace Agent.Plugins.PipelineCache
     public abstract class PipelineCacheTaskPluginBase : IAgentTaskPlugin
     {
         public abstract Guid Id { get; }
-        public string Version => "1.0.0"; // Publish and Download tasks will be always on the same version.
+        public string Version => "0.1.0"; // Publish and Download tasks will be always on the same version.
         public string Stage => "main";
 
         public async Task RunAsync(AgentTaskPluginExecutionContext context, CancellationToken token)
@@ -27,11 +27,11 @@ namespace Agent.Plugins.PipelineCache
             ArgUtil.NotNull(context, nameof(context));
 
             // Finger Print
-            string fingerPrint = context.GetInput(ArtifactEventProperties.fingerPrint, required: true);
+            string fingerPrint = context.GetInput(PipelineCacheTaskPluginConstants.Fingerprints, required: true);
 
             // Path
             // TODO: Translate targetPath from container to host (Ting)
-            string targetPath = context.GetInput(ArtifactEventProperties.TargetPath, required: true);
+            string targetPath = context.GetInput(PipelineCacheTaskPluginConstants.TargetPath, required: true);
 
             await ProcessCommandInternalAsync(context, targetPath, fingerPrint, token);
         }
@@ -47,7 +47,7 @@ namespace Agent.Plugins.PipelineCache
         // Properties set by tasks
         protected static class PipelineCacheTaskPluginConstants
         {
-            public static readonly string Fingerprints = "fingerprints"; // this needs to match the input in the task, weird. 
+            public static readonly string Fingerprints = "fingerprints"; // this needs to match the input in the task.
             public static readonly string TargetPath = "targetPath";
             public static readonly string PipelineId = "pipelineId";
         }
