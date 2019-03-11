@@ -35,67 +35,70 @@ namespace Agent.Plugins.PipelineCache
             DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection);
 
             var result = await dedupManifestClient.PublishAsync(sourceDirectory, cancellationToken);
-
-            Dictionary<string, string> propertiesDictionary = new Dictionary<string, string>();
-            propertiesDictionary.Add(RootId, result.RootId.ValueString);
-            propertiesDictionary.Add(ProofNodes, StringUtil.ConvertToJson(result.ProofNodes.ToArray()));
-            var branchScope = "myscope";
+            var scope = "myscope";
             var salt = "salt";
-            Console.WriteLine("Root id is: {0} and manifest id is:{1} and proof node is:{2}", result.RootId.ValueString, result.ManifestId.ValueString, result.ProofNodes);
 
-            CreatePipelineCacheArtifactOptions options = new CreatePipelineCacheArtifactOptions();
-            options.FingerprintFilePaths = fingerprintPaths;
-            options.RootId = result.RootId;
-            options.ManifestId = result.ManifestId;
-            options.Scope = branchScope;
-            options.ProofNodes = result.ProofNodes.ToArray();
-            options.Salt = salt;
+            CreatePipelineCacheArtifactOptions options = new CreatePipelineCacheArtifactOptions
+            {
+                FingerprintFilePaths = fingerprintPaths,
+                RootId = result.RootId,
+                ManifestId = result.ManifestId,
+                Scope = scope,
+                ProofNodes = result.ProofNodes.ToArray(),
+                Salt = salt
+            };
 
-            IClock clock = UtcClock.Instance;
-
-            var pipelineCacheHttpClient = connection.GetClient<PipelineCacheHttpClient>();
-
-            var pipelineCacheClient = new PipelineCacheClient(pipelineCacheHttpClient, clock);
+            var pipelineCacheClient = this.CreateClient(context, connection);
             await pipelineCacheClient.CreatePipelineCacheArtifactAsync(options, cancellationToken);
 
-            Console.WriteLine("Cache Stored!");
+            Console.WriteLine("Saved item.");
         }
 
         internal async Task DownloadAsync(
             AgentTaskPluginExecutionContext context,
             IEnumerable<string> fingerprintPaths,
             string targetDirectory,
+            string variableToSetOnHit,
             CancellationToken cancellationToken)
         {
             VssConnection connection = context.VssConnection;
-            DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection);
+            var pipelineCacheClient = this.CreateClient(context, connection);
 
-            // Get the manifest ID from pipeline cache based on the fingerprint.
-            IClock clock = UtcClock.Instance;           
-            var pipelineCacheHttpClient = connection.GetClient<PipelineCacheHttpClient>();
-            var pipelineCacheClient = new PipelineCacheClient(pipelineCacheHttpClient, clock); // Do we need expiration time?
-
-            if(pipelineCacheClient == null)
+            GetPipelineCacheArtifactOptions options = new GetPipelineCacheArtifactOptions
             {
-                Console.WriteLine(" No cache item exists!");
-                return;
-            }
-
-            GetPipelineCacheArtifactOptions options = new GetPipelineCacheArtifactOptions();
-            options.FingerprintFilePaths = fingerprintPaths;
-            options.Scope = "myscope";
-            options.Salt = "salt";
+                FingerprintFilePaths = fingerprintPaths,
+                Scope = "myscope",
+                Salt = "salt",
+            };
 
             var result = await pipelineCacheClient.GetPipelineCacheArtifactAsync(options, cancellationToken);
-
-            Console.WriteLine("Manifest ID is : {0}", result.ManifestId.ValueString);
-
-            //Now we have the manifest ID, call BDM to get the content.
-            await this.DownloadPipelineCache(dedupManifestClient, result.ManifestId , targetDirectory, cancellationToken);
-            Console.WriteLine("Cache Restored!");
+            if (result == null)
+            {
+                return;
+            }
+            else
+            {
+                Console.WriteLine("Manifest ID is: {0}", result.ManifestId.ValueString);
+                DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection);
+                await this.DownloadPipelineCacheAsync(dedupManifestClient, result.ManifestId, targetDirectory, cancellationToken);
+                context.SetVariable($"PipelineCache.{variableToSetOnHit}", "True");
+                Console.WriteLine("Cache restored.");
+            }
         }
 
-        private Task DownloadPipelineCache(
+        private PipelineCacheClient CreateClient(
+            AgentTaskPluginExecutionContext context,
+            VssConnection connection)
+        {
+            var tracer = new CallbackAppTraceSource(str => context.Output(str), System.Diagnostics.SourceLevels.Information);
+            IClock clock = UtcClock.Instance;           
+            var pipelineCacheHttpClient = connection.GetClient<PipelineCacheHttpClient>();
+            var pipelineCacheClient = new PipelineCacheClient(pipelineCacheHttpClient, clock, tracer);
+
+            return pipelineCacheClient;
+        }
+
+        private Task DownloadPipelineCacheAsync(
             DedupManifestArtifactClient dedupManifestClient,
             DedupIdentifier manifestId,
             string targetDirectory,

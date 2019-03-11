@@ -26,10 +26,8 @@ namespace Agent.Plugins.PipelineCache
         {
             ArgUtil.NotNull(context, nameof(context));
 
-            // Finger Print
             string fingerPrint = context.GetInput(PipelineCacheTaskPluginConstants.Fingerprints, required: true);
 
-            // Path
             // TODO: Translate targetPath from container to host (Ting)
             string targetPath = context.GetInput(PipelineCacheTaskPluginConstants.TargetPath, required: true);
 
@@ -50,6 +48,7 @@ namespace Agent.Plugins.PipelineCache
             public static readonly string Fingerprints = "fingerprints"; // this needs to match the input in the task.
             public static readonly string TargetPath = "targetPath";
             public static readonly string PipelineId = "pipelineId";
+            public static readonly string VariableToSetOnCacheHit = "cacheHitVar";
         }
     }
 }

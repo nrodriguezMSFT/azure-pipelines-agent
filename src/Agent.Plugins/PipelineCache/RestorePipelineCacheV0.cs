@@ -34,9 +34,15 @@ namespace Agent.Plugins.PipelineCache
                 new[] { "\n" },
                 StringSplitOptions.RemoveEmptyEntries
             );
+            string variableToSetOnHit = context.GetInput(PipelineCacheTaskPluginConstants.VariableToSetOnCacheHit, required: true);
+
             PipelineCacheServer server = new PipelineCacheServer();
-            await server.DownloadAsync(context, fingerprints, targetPath, token);
-            context.SetTaskVariable("CacheResored", "Restored");
+            await server.DownloadAsync(
+                context, 
+                fingerprints, 
+                targetPath,
+                variableToSetOnHit,
+                token);
         }
     }
 }
