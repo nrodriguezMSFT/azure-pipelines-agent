@@ -27,16 +27,21 @@ namespace Agent.Plugins.PipelineCache
         protected override async Task ProcessCommandInternalAsync(
             AgentTaskPluginExecutionContext context, 
             string targetPath, 
-            string fingerPrint,
+            string fingerprint,
+            string salt,
             CancellationToken token)
         {
-            //return Task.CompletedTask;
-            string[] fingerPrints = fingerPrint.Split(
+            string[] fingerprints = fingerprint.Split(
                 new[] { "\n" },
                 StringSplitOptions.RemoveEmptyEntries
             );
             PipelineCacheServer server = new PipelineCacheServer();
-            await server.UploadAsync(context,fingerPrints, targetPath,token);
+            await server.UploadAsync(
+                context,
+                fingerprints, 
+                targetPath,
+                salt,
+                token);
         }
     }
 }

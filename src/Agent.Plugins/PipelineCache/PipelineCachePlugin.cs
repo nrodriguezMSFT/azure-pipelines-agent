@@ -26,19 +26,27 @@ namespace Agent.Plugins.PipelineCache
         {
             ArgUtil.NotNull(context, nameof(context));
 
-            string fingerPrint = context.GetInput(PipelineCacheTaskPluginConstants.Fingerprints, required: true);
+            string fingerprint = context.GetInput(PipelineCacheTaskPluginConstants.Fingerprints, required: true);
 
             // TODO: Translate targetPath from container to host (Ting)
             string targetPath = context.GetInput(PipelineCacheTaskPluginConstants.TargetPath, required: true);
 
-            await ProcessCommandInternalAsync(context, targetPath, fingerPrint, token);
+            string salt = context.GetInput(PipelineCacheTaskPluginConstants.Salt, required: true);            
+
+            await ProcessCommandInternalAsync(
+                context, 
+                targetPath, 
+                fingerprint, 
+                salt,
+                token);
         }
 
         // Process the command with preprocessed arguments.
         protected abstract Task ProcessCommandInternalAsync(
             AgentTaskPluginExecutionContext context, 
             string targetPath, 
-            string fingerPrint, 
+            string fingerprint,
+            string salt,
             CancellationToken token);
 
             
@@ -49,6 +57,8 @@ namespace Agent.Plugins.PipelineCache
             public static readonly string TargetPath = "targetPath";
             public static readonly string PipelineId = "pipelineId";
             public static readonly string VariableToSetOnCacheHit = "cacheHitVar";
+            public static readonly string Salt = "salt";
+            
         }
     }
 }

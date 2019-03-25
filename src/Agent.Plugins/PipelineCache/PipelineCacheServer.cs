@@ -29,6 +29,7 @@ namespace Agent.Plugins.PipelineCache
             AgentTaskPluginExecutionContext context,
             IEnumerable<string> fingerprintPaths,
             string sourceDirectory,
+            string salt,
             CancellationToken cancellationToken)
         {
             VssConnection connection = context.VssConnection;
@@ -36,7 +37,6 @@ namespace Agent.Plugins.PipelineCache
 
             var result = await dedupManifestClient.PublishAsync(sourceDirectory, cancellationToken);
             var scope = "myscope";
-            var salt = "salt";
 
             CreatePipelineCacheArtifactOptions options = new CreatePipelineCacheArtifactOptions
             {
@@ -58,6 +58,7 @@ namespace Agent.Plugins.PipelineCache
             AgentTaskPluginExecutionContext context,
             IEnumerable<string> fingerprintPaths,
             string targetDirectory,
+            string salt,
             string variableToSetOnHit,
             CancellationToken cancellationToken)
         {
@@ -68,7 +69,7 @@ namespace Agent.Plugins.PipelineCache
             {
                 FingerprintFilePaths = fingerprintPaths,
                 Scope = "myscope",
-                Salt = "salt",
+                Salt = salt,
             };
 
             var result = await pipelineCacheClient.GetPipelineCacheArtifactAsync(options, cancellationToken);

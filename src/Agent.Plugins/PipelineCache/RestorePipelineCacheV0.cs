@@ -27,10 +27,11 @@ namespace Agent.Plugins.PipelineCache
         protected override async Task ProcessCommandInternalAsync(
             AgentTaskPluginExecutionContext context, 
             string targetPath, 
-            string fingerPrint,
+            string fingerprint,
+            string salt,
             CancellationToken token)
         {
-            string[] fingerprints = fingerPrint.Split(
+            string[] fingerprints = fingerprint.Split(
                 new[] { "\n" },
                 StringSplitOptions.RemoveEmptyEntries
             );
@@ -41,6 +42,7 @@ namespace Agent.Plugins.PipelineCache
                 context, 
                 fingerprints, 
                 targetPath,
+                salt,
                 variableToSetOnHit,
                 token);
         }
