@@ -27,20 +27,20 @@ namespace Agent.Plugins.PipelineCache
 
         internal async Task UploadAsync(
             AgentTaskPluginExecutionContext context,
-            IEnumerable<string> fingerprintPaths,
-            string sourceDirectory,
+            IEnumerable<string> key,
+            string path,
             string salt,
             CancellationToken cancellationToken)
         {
             VssConnection connection = context.VssConnection;
             DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection);
 
-            var result = await dedupManifestClient.PublishAsync(sourceDirectory, cancellationToken);
+            var result = await dedupManifestClient.PublishAsync(path, cancellationToken);
             var scope = "myscope";
 
             CreatePipelineCacheArtifactOptions options = new CreatePipelineCacheArtifactOptions
             {
-                FingerprintFilePaths = fingerprintPaths,
+                key = key,
                 RootId = result.RootId,
                 ManifestId = result.ManifestId,
                 Scope = scope,
@@ -56,8 +56,8 @@ namespace Agent.Plugins.PipelineCache
 
         internal async Task DownloadAsync(
             AgentTaskPluginExecutionContext context,
-            IEnumerable<string> fingerprintPaths,
-            string targetDirectory,
+            IEnumerable<string> key,
+            string path,
             string salt,
             string variableToSetOnHit,
             CancellationToken cancellationToken)
@@ -67,7 +67,7 @@ namespace Agent.Plugins.PipelineCache
 
             GetPipelineCacheArtifactOptions options = new GetPipelineCacheArtifactOptions
             {
-                FingerprintFilePaths = fingerprintPaths,
+                key = key,
                 Scope = "myscope",
                 Salt = salt,
             };
@@ -81,7 +81,7 @@ namespace Agent.Plugins.PipelineCache
             {
                 Console.WriteLine("Manifest ID is: {0}", result.ManifestId.ValueString);
                 DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection);
-                await this.DownloadPipelineCacheAsync(dedupManifestClient, result.ManifestId, targetDirectory, cancellationToken);
+                await this.DownloadPipelineCacheAsync(dedupManifestClient, result.ManifestId, path, cancellationToken);
                 context.SetVariable($"PipelineCache.{variableToSetOnHit}", "True");
                 Console.WriteLine("Cache restored.");
             }

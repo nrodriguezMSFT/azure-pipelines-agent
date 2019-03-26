@@ -26,12 +26,12 @@ namespace Agent.Plugins.PipelineCache
 
         protected override async Task ProcessCommandInternalAsync(
             AgentTaskPluginExecutionContext context, 
-            string targetPath, 
-            string fingerprint,
+            string path, 
+            string key,
             string salt,
             CancellationToken token)
         {
-            string[] fingerprints = fingerprint.Split(
+            string[] Key = key.Split(
                 new[] { "\n" },
                 StringSplitOptions.RemoveEmptyEntries
             );
@@ -40,8 +40,8 @@ namespace Agent.Plugins.PipelineCache
             PipelineCacheServer server = new PipelineCacheServer();
             await server.DownloadAsync(
                 context, 
-                fingerprints, 
-                targetPath,
+                Key, 
+                path,
                 salt,
                 variableToSetOnHit,
                 token);
