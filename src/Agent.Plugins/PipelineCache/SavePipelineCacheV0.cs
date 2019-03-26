@@ -27,18 +27,18 @@ namespace Agent.Plugins.PipelineCache
         protected override async Task ProcessCommandInternalAsync(
             AgentTaskPluginExecutionContext context, 
             string path, 
-            string key,
+            string keyStr,
             string salt,
             CancellationToken token)
         {
-            string[] Key = key.Split(
+            string[] key = keyStr.Split(
                 new[] { "\n" },
                 StringSplitOptions.RemoveEmptyEntries
             );
             PipelineCacheServer server = new PipelineCacheServer();
             await server.UploadAsync(
                 context,
-                Key, 
+                key, 
                 path,
                 salt,
                 token);

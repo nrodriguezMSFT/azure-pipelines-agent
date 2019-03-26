@@ -26,10 +26,10 @@ namespace Agent.Plugins.PipelineCache
         {
             ArgUtil.NotNull(context, nameof(context));
 
-            string key = context.GetInput(PipelineCacheTaskPluginConstants.key, required: true);
+            string key = context.GetInput(PipelineCacheTaskPluginConstants.Key, required: true);
 
             // TODO: Translate path from container to host (Ting)
-            string path = context.GetInput(PipelineCacheTaskPluginConstants.path, required: true);
+            string path = context.GetInput(PipelineCacheTaskPluginConstants.Path, required: true);
 
             string salt = context.GetInput(PipelineCacheTaskPluginConstants.Salt, required: true);            
 
@@ -53,8 +53,8 @@ namespace Agent.Plugins.PipelineCache
         // Properties set by tasks
         protected static class PipelineCacheTaskPluginConstants
         {
-            public static readonly string key = "key"; // this needs to match the input in the task.
-            public static readonly string path = "path";
+            public static readonly string Key = "key"; // this needs to match the input in the task.
+            public static readonly string Path = "path";
             public static readonly string PipelineId = "pipelineId";
             public static readonly string VariableToSetOnCacheHit = "cacheHitVar";
             public static readonly string Salt = "salt";
