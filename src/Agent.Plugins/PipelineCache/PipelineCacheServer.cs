@@ -40,7 +40,7 @@ namespace Agent.Plugins.PipelineCache
 
             CreatePipelineCacheArtifactOptions options = new CreatePipelineCacheArtifactOptions
             {
-                key = key,
+                Key = key,
                 RootId = result.RootId,
                 ManifestId = result.ManifestId,
                 Scope = scope,
@@ -67,7 +67,7 @@ namespace Agent.Plugins.PipelineCache
 
             GetPipelineCacheArtifactOptions options = new GetPipelineCacheArtifactOptions
             {
-                key = key,
+                Key = key,
                 Scope = "myscope",
                 Salt = salt,
             };
