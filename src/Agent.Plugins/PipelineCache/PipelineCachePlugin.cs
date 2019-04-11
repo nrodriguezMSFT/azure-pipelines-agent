@@ -31,8 +31,10 @@ namespace Agent.Plugins.PipelineCache
             // TODO: Translate path from container to host (Ting)
             string path = context.GetInput(PipelineCacheTaskPluginConstants.Path, required: true);
 
-            string salt = context.GetInput(PipelineCacheTaskPluginConstants.Salt, required: true);            
-
+            // TODO: variable is meant to be temporary until the salt lives in the service side (Pipeline service)
+            VariableValue saltVariable = context.Variables.GetValueOrDefault("AZDEVOPS_PIPELINECACHE_SALT");
+            string salt = saltVariable == null ? "randomSalt" : saltVariable.Value;
+            
             await ProcessCommandInternalAsync(
                 context, 
                 path, 
