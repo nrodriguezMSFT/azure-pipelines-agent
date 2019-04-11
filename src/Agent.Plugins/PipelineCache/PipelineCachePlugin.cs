@@ -4,15 +4,15 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Agent.Sdk;
 using Microsoft.TeamFoundation.Build.WebApi;
-using Microsoft.VisualStudio.Services.BlobStore.Common;
-using Microsoft.VisualStudio.Services.Content.Common.Tracing;
-using Microsoft.VisualStudio.Services.BlobStore.WebApi;
-using Microsoft.VisualStudio.Services.Common;
-using Microsoft.VisualStudio.Services.WebApi;
 using Microsoft.TeamFoundation.DistributedTask.WebApi;
 using Microsoft.VisualStudio.Services.Agent.Util;
-using Agent.Sdk;
+using Microsoft.VisualStudio.Services.BlobStore.Common;
+using Microsoft.VisualStudio.Services.BlobStore.WebApi;
+using Microsoft.VisualStudio.Services.Common;
+using Microsoft.VisualStudio.Services.Content.Common.Tracing;
+using Microsoft.VisualStudio.Services.WebApi;
 
 namespace Agent.Plugins.PipelineCache
 {
@@ -34,7 +34,7 @@ namespace Agent.Plugins.PipelineCache
             // TODO: variable is meant to be temporary until the salt lives in the service side (Pipeline service)
             VariableValue saltVariable = context.Variables.GetValueOrDefault("AZDEVOPS_PIPELINECACHE_SALT");
             string salt = saltVariable == null ? "randomSalt" : saltVariable.Value;
-            
+
             await ProcessCommandInternalAsync(
                 context, 
                 path, 
