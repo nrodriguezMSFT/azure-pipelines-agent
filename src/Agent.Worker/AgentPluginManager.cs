@@ -38,6 +38,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker
             "Agent.Plugins.PipelineArtifact.DownloadPipelineArtifactTaskV1_1_0, Agent.Plugins",
             "Agent.Plugins.PipelineCache.SavePipelineCacheV0, Agent.Plugins",
             "Agent.Plugins.PipelineCache.RestorePipelineCacheV0, Agent.Plugins"
+            "Agent.Plugins.PipelineArtifact.DownloadPipelineArtifactTaskV1_1_1, Agent.Plugins"
         };
 
         private readonly HashSet<string> _commandPlugins = new HashSet<string>();
