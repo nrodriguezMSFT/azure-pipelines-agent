@@ -22,8 +22,9 @@ namespace Agent.Plugins.PipelineCache
 {    
     public class PipelineCacheServer
     {
-        public static readonly string RootId = "RootId";
-        public static readonly string ProofNodes = "ProofNodes";
+        public const string RootId = "RootId";
+        public const string ProofNodes = "ProofNodes";
+        private const string PipelineCacheVarPrefix = "PipelineCache";
 
         internal async Task UploadAsync(
             AgentTaskPluginExecutionContext context,
@@ -82,7 +83,7 @@ namespace Agent.Plugins.PipelineCache
                 Console.WriteLine("Manifest ID is: {0}", result.ManifestId.ValueString);
                 DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection);
                 await this.DownloadPipelineCacheAsync(dedupManifestClient, result.ManifestId, path, cancellationToken);
-                context.SetVariable($"PipelineCache.{variableToSetOnHit}", "True");
+                context.SetVariable($"{PipelineCacheVarPrefix}.{variableToSetOnHit}", "True");
                 Console.WriteLine("Cache restored.");
             }
         }

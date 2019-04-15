@@ -30,7 +30,7 @@ namespace Agent.Plugins.PipelineCache
             CancellationToken token)
         {
             string[] key = keyStr.Split(
-                new[] { "\n" },
+                new[] { '\n' },
                 StringSplitOptions.RemoveEmptyEntries
             );
             PipelineCacheServer server = new PipelineCacheServer();
