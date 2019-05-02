@@ -250,7 +250,7 @@ namespace Agent.Plugins.PipelineArtifact
             var tracer = new CallbackAppTraceSource(str => context.Output(str), System.Diagnostics.SourceLevels.Information);
             artifactClientTelemetry = new ArtifactClientTelemetry(tracer, ClientType.PipelineArtifact);
             dedupStoreHttpClient.SetTracer(tracer);
-            var client = new DedupStoreClientWithDataport(dedupStoreHttpClient, 16 * Environment.ProcessorCount);            
+            var client = new DedupStoreClientWithDataport(dedupStoreHttpClient, 16 * Environment.ProcessorCount);
             var buildDropManager = new BuildDropManager(artifactClientTelemetry, client, tracer);
             return buildDropManager;
         }
