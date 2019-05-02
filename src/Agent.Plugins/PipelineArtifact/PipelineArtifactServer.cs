@@ -35,7 +35,7 @@ namespace Agent.Plugins.PipelineArtifact
             string name,
             string source,
             CancellationToken cancellationToken)
-        {           
+        {
             VssConnection connection = context.VssConnection;
             var buildDropManager = this.CreateBulidDropManager(context, connection);
 
@@ -43,20 +43,20 @@ namespace Agent.Plugins.PipelineArtifact
             PublishResult result;
             if (buildDropManager.TelemetryEnabled)
             {
-                ActionTelemetryRecord actionRecord = artifactClientTelemetry.CreateAction(nameof(PipelineArtifactServer.UploadAsync));
+                ArtifactTelemetryRecord artifactRecord = artifactClientTelemetry.CreateRecord(nameof(UploadAsync));
                 try
                 {
                     result = await this.artifactClientTelemetry.MeasureActionAsync(
-                        record: actionRecord,
+                        record: artifactRecord,
                         actionAsync: async () =>
                         {
-                            return await buildDropManager.PublishAsync(source, cancellationToken);                    
+                            return await buildDropManager.PublishAsync(source, cancellationToken);
                         }
                     ).ConfigureAwait(false);
                 }
                 catch (Exception exception)
                 {
-                    var errorRecord = artifactClientTelemetry.CreateError(exception, nameof(DownloadAsync), "Some artifacts");
+                    ErrorTelemetryRecord errorRecord = artifactClientTelemetry.CreateError(exception, nameof(UploadAsync), name);
                     this.artifactClientTelemetry.SendErrorTelemetry(errorRecord);
                     throw;
                 }
@@ -111,7 +111,7 @@ namespace Agent.Plugins.PipelineArtifact
             // Placeholder telemetry
             if (buildDropManager.TelemetryEnabled)
             {
-                ActionTelemetryRecord downloadAsyncEntry = artifactClientTelemetry.CreateAction("DownloadAsyncEntry");
+                ArtifactTelemetryRecord downloadAsyncEntry = artifactClientTelemetry.CreateRecord("DownloadAsyncEntry");
                 artifactClientTelemetry.SendRecord(downloadAsyncEntry);
 
                 try
@@ -120,21 +120,14 @@ namespace Agent.Plugins.PipelineArtifact
                 }
                 catch (Exception exception)
                 {
-                    var errorRecord = artifactClientTelemetry.CreateError(exception, nameof(DownloadAsync), "Some artifacts");
+                    ErrorTelemetryRecord errorRecord = artifactClientTelemetry.CreateError(exception, nameof(DownloadAsync));
                     this.artifactClientTelemetry.SendErrorTelemetry(errorRecord);
                 }
             }
-
+            
             // download all pipeline artifacts if artifact name is missing
             if (downloadOptions == DownloadOptions.MultiDownload)
             {
-                // Placeholder telemetry
-                if (buildDropManager.TelemetryEnabled)
-                {
-                    ActionTelemetryRecord multiDownloadEntry = artifactClientTelemetry.CreateAction("MultiDownloadEntry");
-                    artifactClientTelemetry.SendRecord(multiDownloadEntry);
-                }
-
                 List<BuildArtifact> artifacts;
                 if (downloadParameters.ProjectRetrievalOptions == BuildArtifactRetrievalOptions.RetrieveByProjectId)
                 {
@@ -178,11 +171,11 @@ namespace Agent.Plugins.PipelineArtifact
                     if (buildDropManager.TelemetryEnabled)
                     {
                         long count = 0;
-                        ActionTelemetryRecord actionRecord = artifactClientTelemetry.CreateAction(nameof(DownloadAsync));
+                        ArtifactTelemetryRecord artifactRecord = artifactClientTelemetry.CreateRecord(nameof(DownloadAsync));
                         try
                         {
                             await this.artifactClientTelemetry.MeasureActionAsync(
-                                record: actionRecord,
+                                record: artifactRecord,
                                 actionAsync: async () =>
                                 {
                                     await buildDropManager.DownloadAsync(options, cancellationToken);
@@ -192,12 +185,11 @@ namespace Agent.Plugins.PipelineArtifact
                         }
                         catch (Exception exception)
                         {
-                            var errorRecord = artifactClientTelemetry.CreateError(exception, nameof(DownloadAsync), "Some artifacts");
+                            ErrorTelemetryRecord errorRecord = artifactClientTelemetry.CreateError(exception, nameof(DownloadAsync));
                             this.artifactClientTelemetry.SendErrorTelemetry(errorRecord);
-                            throw;
                         }
                     }
-                    else 
+                    else
                     {
                         await buildDropManager.DownloadAsync(options, cancellationToken);
                     }
@@ -205,13 +197,6 @@ namespace Agent.Plugins.PipelineArtifact
             }
             else if (downloadOptions == DownloadOptions.SingleDownload)
             {
-                // placeholder telemetry
-                if (buildDropManager.TelemetryEnabled)
-                {
-                    ActionTelemetryRecord singleDownloadEntry = artifactClientTelemetry.CreateAction("SingleDownloadEntry");
-                    artifactClientTelemetry.SendRecord(singleDownloadEntry);
-                }
-
                 // 1) get manifest id from artifact data
                 BuildArtifact buildArtifact;
                 if (downloadParameters.ProjectRetrievalOptions == BuildArtifactRetrievalOptions.RetrieveByProjectId)
@@ -244,15 +229,15 @@ namespace Agent.Plugins.PipelineArtifact
                 if (buildDropManager.TelemetryEnabled)
                 {
                     long count = 0;
-                    ActionTelemetryRecord actionRecord = artifactClientTelemetry.CreateAction(nameof(PipelineArtifactServer.DownloadAsync));                
+                    ArtifactTelemetryRecord artifactRecord = artifactClientTelemetry.CreateRecord(nameof(DownloadAsync));
                     await this.artifactClientTelemetry.MeasureActionAsync(
-                        record: actionRecord,
+                        record: artifactRecord,
                         actionAsync: async () =>
                         {
                             await buildDropManager.DownloadAsync(options, cancellationToken);
                         },
                         actionResultToTelemetryStatus: () => ArtifactClientTelemetry.SuccessfulActionResult,
-                        actionResultToItemCountAsync: () => Task.FromResult<long>(count));                    
+                        actionResultToItemCountAsync: () => Task.FromResult<long>(count));
                 }
                 else
                 {
@@ -262,16 +247,16 @@ namespace Agent.Plugins.PipelineArtifact
             else
             {
                 throw new InvalidOperationException("Unreachable code!");
-            }            
+            }
         }
 
         private BuildDropManager CreateBulidDropManager(AgentTaskPluginExecutionContext context, VssConnection connection)
         {
             var dedupStoreHttpClient = connection.GetClient<DedupStoreHttpClient>();
             var tracer = new CallbackAppTraceSource(str => context.Output(str), System.Diagnostics.SourceLevels.Information);
-            artifactClientTelemetry = new ArtifactClientTelemetry(tracer);
+            artifactClientTelemetry = new ArtifactClientTelemetry(tracer, ClientType.PipelineArtifact);
             dedupStoreHttpClient.SetTracer(tracer);
-            var client = new DedupStoreClientWithDataport(dedupStoreHttpClient, 16 * Environment.ProcessorCount);
+            var client = new DedupStoreClientWithDataport(dedupStoreHttpClient, 16 * Environment.ProcessorCount);            
             var buildDropManager = new BuildDropManager(artifactClientTelemetry, client, tracer);
             return buildDropManager;
         }
@@ -305,7 +290,7 @@ namespace Agent.Plugins.PipelineArtifact
 
     internal enum DownloadOptions
     {
-        SingleDownload,        
+        SingleDownload,
         MultiDownload
     }
 }
