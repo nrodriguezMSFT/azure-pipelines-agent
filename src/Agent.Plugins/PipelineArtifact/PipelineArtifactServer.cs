@@ -170,7 +170,6 @@ namespace Agent.Plugins.PipelineArtifact
 
                     if (buildDropManager.TelemetryEnabled)
                     {
-                        long count = 0;
                         ArtifactTelemetryRecord artifactRecord = artifactClientTelemetry.CreateRecord(nameof(DownloadAsync));
                         try
                         {
@@ -179,9 +178,7 @@ namespace Agent.Plugins.PipelineArtifact
                                 actionAsync: async () =>
                                 {
                                     await buildDropManager.DownloadAsync(options, cancellationToken);
-                                },
-                                actionResultToTelemetryStatus: () => ArtifactClientTelemetry.SuccessfulActionResult,
-                                actionResultToItemCountAsync: () => Task.FromResult<long>(count)).ConfigureAwait(false);
+                                }).ConfigureAwait(false);
                         }
                         catch (Exception exception)
                         {
@@ -228,16 +225,13 @@ namespace Agent.Plugins.PipelineArtifact
                 
                 if (buildDropManager.TelemetryEnabled)
                 {
-                    long count = 0;
                     ArtifactTelemetryRecord artifactRecord = artifactClientTelemetry.CreateRecord(nameof(DownloadAsync));
                     await this.artifactClientTelemetry.MeasureActionAsync(
                         record: artifactRecord,
                         actionAsync: async () =>
                         {
                             await buildDropManager.DownloadAsync(options, cancellationToken);
-                        },
-                        actionResultToTelemetryStatus: () => ArtifactClientTelemetry.SuccessfulActionResult,
-                        actionResultToItemCountAsync: () => Task.FromResult<long>(count));
+                        });
                 }
                 else
                 {
