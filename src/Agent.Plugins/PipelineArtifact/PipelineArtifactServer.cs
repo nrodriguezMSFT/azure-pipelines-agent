@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -26,10 +25,6 @@ namespace Agent.Plugins.PipelineArtifact
         public static readonly string RootId = "RootId";
         public static readonly string ProofNodes = "ProofNodes";
         private const ClientType pipelineClientType = ClientType.PipelineArtifact;
-        private ArtifactClientTelemetry artifactClientTelemetry;
-        // Temporary environment variable used to enable telemetry.
-        // TODO: Remove TelemetryEnabled when telemetry is stable to enable capturing telemetry by default.
-        private readonly bool TelemetryEnabled = int.Parse(Environment.GetEnvironmentVariable("VSO_BUILD_DROP_TELEMETRY", EnvironmentVariableTarget.Process) ?? "0") == 1;
 
         // Upload from target path to Azure DevOps BlobStore service through DedupManifestArtifactClient, then associate it with the build
         internal async Task UploadAsync(
@@ -41,33 +36,26 @@ namespace Agent.Plugins.PipelineArtifact
             CancellationToken cancellationToken)
         {
             VssConnection connection = context.VssConnection;
-            DedupManifestArtifactClient dedupManifestClient = CreateDedupManifestClient(context, connection, pipelineClientType);
+            DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection, pipelineClientType);
 
             //Upload the pipeline artifact.
             PublishResult result;
-            if (TelemetryEnabled)
+            BlobStoreTelemetryRecord blobStoreRecord = dedupManifestClient.Telemetry.CreateRecord(nameof(UploadAsync));
+            try
             {
-                ArtifactTelemetryRecord artifactRecord = artifactClientTelemetry.CreateRecord(nameof(UploadAsync));
-                try
-                {
-                    result = await this.artifactClientTelemetry.MeasureActionAsync(
-                        record: artifactRecord,
-                        actionAsync: async () =>
-                        {
-                            return await dedupManifestClient.PublishAsync(source, cancellationToken);
-                        }
-                    ).ConfigureAwait(false);
-                }
-                catch (Exception exception)
-                {
-                    ErrorTelemetryRecord errorRecord = artifactClientTelemetry.CreateError(exception, nameof(UploadAsync), name);
-                    this.artifactClientTelemetry.SendErrorTelemetry(errorRecord);
-                    throw;
-                }
+                result = await dedupManifestClient.Telemetry.MeasureActionAsync(
+                    record: blobStoreRecord,
+                    actionAsync: async () =>
+                    {
+                        return await dedupManifestClient.PublishAsync(source, cancellationToken);
+                    }
+                ).ConfigureAwait(false);
             }
-            else
+            catch (Exception exception)
             {
-                result = await dedupManifestClient.PublishAsync(source, cancellationToken);
+                ErrorTelemetryRecord errorRecord = dedupManifestClient.Telemetry.CreateError(exception, nameof(UploadAsync), name);
+                dedupManifestClient.Telemetry.SendErrorTelemetry(errorRecord);
+                throw;
             }
 
             // 2) associate the pipeline artifact with an build artifact
@@ -109,24 +97,20 @@ namespace Agent.Plugins.PipelineArtifact
             CancellationToken cancellationToken)
         {
             VssConnection connection = context.VssConnection;
-            DedupManifestArtifactClient dedupManifestClient = CreateDedupManifestClient(context, connection, pipelineClientType);
+            DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection, pipelineClientType);
             BuildServer buildHelper = new BuildServer(connection);
 
             // Placeholder telemetry
-            if (TelemetryEnabled)
+            BlobStoreTelemetryRecord downloadAsyncEntry = dedupManifestClient.Telemetry.CreateRecord("DownloadAsyncEntry");
+            dedupManifestClient.Telemetry.SendRecord(downloadAsyncEntry);
+            try
             {
-                ArtifactTelemetryRecord downloadAsyncEntry = artifactClientTelemetry.CreateRecord("DownloadAsyncEntry");
-                artifactClientTelemetry.SendRecord(downloadAsyncEntry);
-
-                try
-                {
-                    throw new Exception("test error");
-                }
-                catch (Exception exception)
-                {
-                    ErrorTelemetryRecord errorRecord = artifactClientTelemetry.CreateError(exception, nameof(DownloadAsync));
-                    this.artifactClientTelemetry.SendErrorTelemetry(errorRecord);
-                }
+                throw new Exception("test error");
+            }
+            catch (Exception exception)
+            {
+                ErrorTelemetryRecord errorRecord = dedupManifestClient.Telemetry.CreateError(exception, nameof(DownloadAsync));
+                dedupManifestClient.Telemetry.SendErrorTelemetry(errorRecord);
             }
 
             // download all pipeline artifacts if artifact name is missing
@@ -172,27 +156,20 @@ namespace Agent.Plugins.PipelineArtifact
                         proxyUri: null,
                         minimatchPatterns: downloadParameters.MinimatchFilters);
 
-                    if (TelemetryEnabled)
+                    BlobStoreTelemetryRecord blobStoreRecord = dedupManifestClient.Telemetry.CreateRecord(nameof(DownloadAsync));
+                    try
                     {
-                        ArtifactTelemetryRecord artifactRecord = artifactClientTelemetry.CreateRecord(nameof(DownloadAsync));
-                        try
-                        {
-                            await this.artifactClientTelemetry.MeasureActionAsync(
-                                record: artifactRecord,
-                                actionAsync: async () =>
-                                {
-                                    await dedupManifestClient.DownloadAsync(options, cancellationToken);
-                                }).ConfigureAwait(false);
-                        }
-                        catch (Exception exception)
-                        {
-                            ErrorTelemetryRecord errorRecord = artifactClientTelemetry.CreateError(exception, nameof(DownloadAsync));
-                            this.artifactClientTelemetry.SendErrorTelemetry(errorRecord);
-                        }
+                        await dedupManifestClient.Telemetry.MeasureActionAsync(
+                            record: blobStoreRecord,
+                            actionAsync: async () =>
+                            {
+                                await dedupManifestClient.DownloadAsync(options, cancellationToken);
+                            }).ConfigureAwait(false);
                     }
-                    else
+                    catch (Exception exception)
                     {
-                        await dedupManifestClient.DownloadAsync(options, cancellationToken);
+                        ErrorTelemetryRecord errorRecord = dedupManifestClient.Telemetry.CreateError(exception, nameof(DownloadAsync));
+                        dedupManifestClient.Telemetry.SendErrorTelemetry(errorRecord);
                     }
                 }
             }
@@ -227,35 +204,18 @@ namespace Agent.Plugins.PipelineArtifact
                     proxyUri: null,
                     minimatchPatterns: downloadParameters.MinimatchFilters);
                 
-                if (TelemetryEnabled)
-                {
-                    ArtifactTelemetryRecord artifactRecord = artifactClientTelemetry.CreateRecord(nameof(DownloadAsync));
-                    await this.artifactClientTelemetry.MeasureActionAsync(
-                        record: artifactRecord,
-                        actionAsync: async () =>
-                        {
-                            await dedupManifestClient.DownloadAsync(options, cancellationToken);
-                        });
-                }
-                else
-                {
-                    await dedupManifestClient.DownloadAsync(options, cancellationToken);
-                }
+                BlobStoreTelemetryRecord blobStoreRecord = dedupManifestClient.Telemetry.CreateRecord(nameof(DownloadAsync));
+                await dedupManifestClient.Telemetry.MeasureActionAsync(
+                    record: blobStoreRecord,
+                    actionAsync: async () =>
+                    {
+                        await dedupManifestClient.DownloadAsync(options, cancellationToken);
+                    });
             }
             else
             {
                 throw new InvalidOperationException("Unreachable code!");
             }
-        }
-
-        /// <summary>
-        /// Creates a DedupManifestArtifactClient and exposes ArtifactClientTelemetry.
-        /// </summary>
-        private DedupManifestArtifactClient CreateDedupManifestClient(AgentTaskPluginExecutionContext context, VssConnection connection, ClientType clientType)
-        {
-            var tracer = new CallbackAppTraceSource(str => context.Output(str), SourceLevels.Information);
-            artifactClientTelemetry = new ArtifactClientTelemetry(tracer, clientType);
-            return DedupManifestArtifactClientFactory.CreateDedupManifestClient(connection, artifactClientTelemetry, tracer);
         }
     }
 

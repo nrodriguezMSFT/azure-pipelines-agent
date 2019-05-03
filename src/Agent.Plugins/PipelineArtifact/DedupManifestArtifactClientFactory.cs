@@ -25,17 +25,12 @@ namespace Agent.Plugins.PipelineArtifact
 
         public static DedupManifestArtifactClient CreateDedupManifestClient(AgentTaskPluginExecutionContext context, VssConnection connection, ClientType clientType = ClientType.Unknown)
         {
-            var tracer = new CallbackAppTraceSource(str => context.Output(str), SourceLevels.Information);
-            var artifactClientTelemetry = new ArtifactClientTelemetry(tracer, clientType);
-            return CreateDedupManifestClient(connection, artifactClientTelemetry, tracer);
-        }
-        
-        public static DedupManifestArtifactClient CreateDedupManifestClient(VssConnection connection, ArtifactClientTelemetry artifactClientTelemetry, IAppTraceSource tracer)
-        {
             var dedupStoreHttpClient = connection.GetClient<DedupStoreHttpClient>();
+            var tracer = new CallbackAppTraceSource(str => context.Output(str), SourceLevels.Information);
             dedupStoreHttpClient.SetTracer(tracer);
+            var blobStoreClientTelemetry = new BlobStoreClientTelemetry(tracer, clientType);
             var client = new DedupStoreClientWithDataport(dedupStoreHttpClient, DedupStoreClientMaxParallelism);
-            var dedupManifestClient = new DedupManifestArtifactClient(artifactClientTelemetry, client, tracer);
+            var dedupManifestClient = new DedupManifestArtifactClient(blobStoreClientTelemetry, client, tracer);
             return dedupManifestClient;
         }
     }
