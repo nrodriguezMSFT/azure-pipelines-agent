@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -19,15 +20,18 @@ using Agent.Sdk;
 
 namespace Agent.Plugins.PipelineArtifact
 {    
-    // A wrapper of BuildDropManager, providing basic functionalities such as uploading and downloading pipeline artifacts.
+    // A wrapper of DedupManifestArtifactClient, providing basic functionalities such as uploading and downloading pipeline artifacts.
     public class PipelineArtifactServer
     {
         public static readonly string RootId = "RootId";
         public static readonly string ProofNodes = "ProofNodes";
-        public const string PipelineArtifactTypeName = "PipelineArtifact";
+        private const ClientType pipelineClientType = ClientType.PipelineArtifact;
         private ArtifactClientTelemetry artifactClientTelemetry;
+        // Temporary environment variable used to enable telemetry.
+        // TODO: Remove TelemetryEnabled when telemetry is stable to enable capturing telemetry by default.
+        private readonly bool TelemetryEnabled = int.Parse(Environment.GetEnvironmentVariable("VSO_BUILD_DROP_TELEMETRY", EnvironmentVariableTarget.Process) ?? "0") == 1;
 
-        // Upload from target path to VSTS BlobStore service through BuildDropManager, then associate it with the build
+        // Upload from target path to Azure DevOps BlobStore service through DedupManifestArtifactClient, then associate it with the build
         internal async Task UploadAsync(
             AgentTaskPluginExecutionContext context,
             Guid projectId,
@@ -37,11 +41,11 @@ namespace Agent.Plugins.PipelineArtifact
             CancellationToken cancellationToken)
         {
             VssConnection connection = context.VssConnection;
-            var buildDropManager = this.CreateBulidDropManager(context, connection);
+            DedupManifestArtifactClient dedupManifestClient = CreateDedupManifestClient(context, connection, pipelineClientType);
 
             //Upload the pipeline artifact.
             PublishResult result;
-            if (buildDropManager.TelemetryEnabled)
+            if (TelemetryEnabled)
             {
                 ArtifactTelemetryRecord artifactRecord = artifactClientTelemetry.CreateRecord(nameof(UploadAsync));
                 try
@@ -50,7 +54,7 @@ namespace Agent.Plugins.PipelineArtifact
                         record: artifactRecord,
                         actionAsync: async () =>
                         {
-                            return await buildDropManager.PublishAsync(source, cancellationToken);
+                            return await dedupManifestClient.PublishAsync(source, cancellationToken);
                         }
                     ).ConfigureAwait(false);
                 }
@@ -63,7 +67,7 @@ namespace Agent.Plugins.PipelineArtifact
             }
             else
             {
-                result = await buildDropManager.PublishAsync(source, cancellationToken);
+                result = await dedupManifestClient.PublishAsync(source, cancellationToken);
             }
 
             // 2) associate the pipeline artifact with an build artifact
@@ -75,7 +79,7 @@ namespace Agent.Plugins.PipelineArtifact
             context.Output(StringUtil.Loc("AssociateArtifactWithBuild", artifact.Id, pipelineId));
         }
 
-        // Download pipeline artifact from VSTS BlobStore service through BuildDropManager to a target path
+        // Download pipeline artifact from Azure DevOps BlobStore service through DedupManifestArtifactClient to a target path
         // Old V0 function
         internal Task DownloadAsync(
             AgentTaskPluginExecutionContext context,
@@ -105,11 +109,11 @@ namespace Agent.Plugins.PipelineArtifact
             CancellationToken cancellationToken)
         {
             VssConnection connection = context.VssConnection;
-            var buildDropManager = this.CreateBulidDropManager(context, connection);
+            DedupManifestArtifactClient dedupManifestClient = CreateDedupManifestClient(context, connection, pipelineClientType);
             BuildServer buildHelper = new BuildServer(connection);
 
             // Placeholder telemetry
-            if (buildDropManager.TelemetryEnabled)
+            if (TelemetryEnabled)
             {
                 ArtifactTelemetryRecord downloadAsyncEntry = artifactClientTelemetry.CreateRecord("DownloadAsyncEntry");
                 artifactClientTelemetry.SendRecord(downloadAsyncEntry);
@@ -124,7 +128,7 @@ namespace Agent.Plugins.PipelineArtifact
                     this.artifactClientTelemetry.SendErrorTelemetry(errorRecord);
                 }
             }
-            
+
             // download all pipeline artifacts if artifact name is missing
             if (downloadOptions == DownloadOptions.MultiDownload)
             {
@@ -149,7 +153,7 @@ namespace Agent.Plugins.PipelineArtifact
                     throw new InvalidOperationException("Unreachable code!");
                 }
 
-                IEnumerable<BuildArtifact> pipelineArtifacts = artifacts.Where(a => a.Resource.Type == PipelineArtifactTypeName);
+                IEnumerable<BuildArtifact> pipelineArtifacts = artifacts.Where(a => a.Resource.Type == pipelineClientType.ToString());
                 if (pipelineArtifacts.Count() == 0)
                 {
                     throw new ArgumentException("Could not find any pipeline artifacts in the build.");
@@ -168,7 +172,7 @@ namespace Agent.Plugins.PipelineArtifact
                         proxyUri: null,
                         minimatchPatterns: downloadParameters.MinimatchFilters);
 
-                    if (buildDropManager.TelemetryEnabled)
+                    if (TelemetryEnabled)
                     {
                         ArtifactTelemetryRecord artifactRecord = artifactClientTelemetry.CreateRecord(nameof(DownloadAsync));
                         try
@@ -177,7 +181,7 @@ namespace Agent.Plugins.PipelineArtifact
                                 record: artifactRecord,
                                 actionAsync: async () =>
                                 {
-                                    await buildDropManager.DownloadAsync(options, cancellationToken);
+                                    await dedupManifestClient.DownloadAsync(options, cancellationToken);
                                 }).ConfigureAwait(false);
                         }
                         catch (Exception exception)
@@ -188,7 +192,7 @@ namespace Agent.Plugins.PipelineArtifact
                     }
                     else
                     {
-                        await buildDropManager.DownloadAsync(options, cancellationToken);
+                        await dedupManifestClient.DownloadAsync(options, cancellationToken);
                     }
                 }
             }
@@ -223,19 +227,19 @@ namespace Agent.Plugins.PipelineArtifact
                     proxyUri: null,
                     minimatchPatterns: downloadParameters.MinimatchFilters);
                 
-                if (buildDropManager.TelemetryEnabled)
+                if (TelemetryEnabled)
                 {
                     ArtifactTelemetryRecord artifactRecord = artifactClientTelemetry.CreateRecord(nameof(DownloadAsync));
                     await this.artifactClientTelemetry.MeasureActionAsync(
                         record: artifactRecord,
                         actionAsync: async () =>
                         {
-                            await buildDropManager.DownloadAsync(options, cancellationToken);
+                            await dedupManifestClient.DownloadAsync(options, cancellationToken);
                         });
                 }
                 else
                 {
-                    await buildDropManager.DownloadAsync(options, cancellationToken);
+                    await dedupManifestClient.DownloadAsync(options, cancellationToken);
                 }
             }
             else
@@ -244,15 +248,14 @@ namespace Agent.Plugins.PipelineArtifact
             }
         }
 
-        private BuildDropManager CreateBulidDropManager(AgentTaskPluginExecutionContext context, VssConnection connection)
+        /// <summary>
+        /// Creates a DedupManifestArtifactClient and exposes ArtifactClientTelemetry.
+        /// </summary>
+        private DedupManifestArtifactClient CreateDedupManifestClient(AgentTaskPluginExecutionContext context, VssConnection connection, ClientType clientType)
         {
-            var dedupStoreHttpClient = connection.GetClient<DedupStoreHttpClient>();
-            var tracer = new CallbackAppTraceSource(str => context.Output(str), System.Diagnostics.SourceLevels.Information);
-            artifactClientTelemetry = new ArtifactClientTelemetry(tracer, ClientType.PipelineArtifact);
-            dedupStoreHttpClient.SetTracer(tracer);
-            var client = new DedupStoreClientWithDataport(dedupStoreHttpClient, 16 * Environment.ProcessorCount);
-            var buildDropManager = new BuildDropManager(artifactClientTelemetry, client, tracer);
-            return buildDropManager;
+            var tracer = new CallbackAppTraceSource(str => context.Output(str), SourceLevels.Information);
+            artifactClientTelemetry = new ArtifactClientTelemetry(tracer, clientType);
+            return DedupManifestArtifactClientFactory.CreateDedupManifestClient(connection, artifactClientTelemetry, tracer);
         }
     }
 
