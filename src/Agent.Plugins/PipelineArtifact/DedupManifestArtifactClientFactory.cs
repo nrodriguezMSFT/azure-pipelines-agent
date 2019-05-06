@@ -23,12 +23,12 @@ namespace Agent.Plugins.PipelineArtifact
     {
         private static readonly int DedupStoreClientMaxParallelism = 16 * Environment.ProcessorCount;
 
-        public static DedupManifestArtifactClient CreateDedupManifestClient(AgentTaskPluginExecutionContext context, VssConnection connection, ClientType clientType = ClientType.Unknown)
+        public static DedupManifestArtifactClient CreateDedupManifestClient(AgentTaskPluginExecutionContext context, VssConnection connection)
         {
             var dedupStoreHttpClient = connection.GetClient<DedupStoreHttpClient>();
             var tracer = new CallbackAppTraceSource(str => context.Output(str), SourceLevels.Information);
             dedupStoreHttpClient.SetTracer(tracer);
-            var blobStoreClientTelemetry = new BlobStoreClientTelemetry(tracer, clientType);
+            var blobStoreClientTelemetry = new BlobStoreClientTelemetry(tracer);
             var client = new DedupStoreClientWithDataport(dedupStoreHttpClient, DedupStoreClientMaxParallelism);
             var dedupManifestClient = new DedupManifestArtifactClient(blobStoreClientTelemetry, client, tracer);
             return dedupManifestClient;
