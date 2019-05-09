@@ -37,16 +37,17 @@ namespace Agent.Plugins.PipelineArtifact
             CancellationToken cancellationToken)
         {
             VssConnection connection = context.VssConnection;
-            DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection);
+            BlobStoreClientTelemetry clientTelemetry;
+            DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection, out clientTelemetry);
 
             //Upload the pipeline artifact.
             PublishResult result;
-            PipelineArtifactActionRecord blobStoreRecord = dedupManifestClient.ClientTelemetry.CreateRecord<PipelineArtifactActionRecord>((level, uri, type) =>
+            PipelineArtifactActionRecord uploadRecord = clientTelemetry.CreateRecord<PipelineArtifactActionRecord>((level, uri, type) =>
                 new PipelineArtifactActionRecord(level, uri, type, nameof(UploadAsync), context));
             try
             {
-                result = await dedupManifestClient.ClientTelemetry.MeasureActionAsync(
-                    record: blobStoreRecord,
+                result = await clientTelemetry.MeasureActionAsync(
+                    record: uploadRecord,
                     actionAsync: async () =>
                     {
                         return await dedupManifestClient.PublishAsync(source, cancellationToken);
@@ -55,7 +56,7 @@ namespace Agent.Plugins.PipelineArtifact
             }
             catch (Exception exception)
             {
-                dedupManifestClient.ClientTelemetry.SendErrorTelemetry(exception, nameof(UploadAsync), name);                
+                clientTelemetry.SendErrorTelemetry(exception, nameof(UploadAsync), name);                
                 throw;
             }
 
@@ -66,6 +67,9 @@ namespace Agent.Plugins.PipelineArtifact
             propertiesDictionary.Add(ProofNodes, StringUtil.ConvertToJson(result.ProofNodes.ToArray()));
             var artifact = await buildHelper.AssociateArtifact(projectId, pipelineId, name, ArtifactResourceTypes.PipelineArtifact, result.ManifestId.ValueString, propertiesDictionary, cancellationToken);
             context.Output(StringUtil.Loc("AssociateArtifactWithBuild", artifact.Id, pipelineId));
+
+            // Allow Telemetry Client to flush out any pending telemetry.
+            clientTelemetry.StopSenders();
         }
 
         // Download pipeline artifact from Azure DevOps BlobStore service through DedupManifestArtifactClient to a target path
@@ -98,22 +102,10 @@ namespace Agent.Plugins.PipelineArtifact
             CancellationToken cancellationToken)
         {
             VssConnection connection = context.VssConnection;
-            DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection);
+            BlobStoreClientTelemetry clientTelemetry;
+            DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection, out clientTelemetry);
             BuildServer buildHelper = new BuildServer(connection);
-
-            // Placeholder telemetry
-            PipelineArtifactActionRecord placeholderDownloadRecord = dedupManifestClient.ClientTelemetry.CreateRecord<PipelineArtifactActionRecord>((level, uri, type) =>
-                new PipelineArtifactActionRecord(level, uri, type, nameof(DownloadAsync), context));
-            dedupManifestClient.ClientTelemetry.SendRecord(placeholderDownloadRecord);
-            try
-            {
-                throw new Exception("test error");
-            }
-            catch (Exception exception)
-            {
-                dedupManifestClient.ClientTelemetry.SendErrorTelemetry(exception, nameof(DownloadAsync));
-            }
-
+            
             // download all pipeline artifacts if artifact name is missing
             if (downloadOptions == DownloadOptions.MultiDownload)
             {
@@ -157,11 +149,11 @@ namespace Agent.Plugins.PipelineArtifact
                         proxyUri: null,
                         minimatchPatterns: downloadParameters.MinimatchFilters);
 
-                    PipelineArtifactActionRecord blobStoreRecord = dedupManifestClient.ClientTelemetry.CreateRecord<PipelineArtifactActionRecord>((level, uri, type) =>
+                    PipelineArtifactActionRecord blobStoreRecord = clientTelemetry.CreateRecord<PipelineArtifactActionRecord>((level, uri, type) =>
                         new PipelineArtifactActionRecord(level, uri, type, nameof(DownloadAsync), context));
                     try
                     {
-                        await dedupManifestClient.ClientTelemetry.MeasureActionAsync(
+                        await clientTelemetry.MeasureActionAsync(
                             record: blobStoreRecord,
                             actionAsync: async () =>
                             {
@@ -170,7 +162,7 @@ namespace Agent.Plugins.PipelineArtifact
                     }
                     catch (Exception exception)
                     {
-                        dedupManifestClient.ClientTelemetry.SendErrorTelemetry(exception, nameof(DownloadAsync));
+                        clientTelemetry.SendErrorTelemetry(exception, nameof(DownloadAsync));
                     }
                 }
             }
@@ -205,9 +197,9 @@ namespace Agent.Plugins.PipelineArtifact
                     proxyUri: null,
                     minimatchPatterns: downloadParameters.MinimatchFilters);
                 
-                PipelineArtifactActionRecord blobStoreRecord = dedupManifestClient.ClientTelemetry.CreateRecord<PipelineArtifactActionRecord>((level, uri, type) =>
+                PipelineArtifactActionRecord blobStoreRecord = clientTelemetry.CreateRecord<PipelineArtifactActionRecord>((level, uri, type) =>
                         new PipelineArtifactActionRecord(level, uri, type, nameof(DownloadAsync), context));
-                await dedupManifestClient.ClientTelemetry.MeasureActionAsync(
+                await clientTelemetry.MeasureActionAsync(
                     record: blobStoreRecord,
                     actionAsync: async () =>
                     {
@@ -218,7 +210,10 @@ namespace Agent.Plugins.PipelineArtifact
             {
                 throw new InvalidOperationException("Unreachable code!");
             }
-        }
+            
+            // Allow Telemetry Client to flush out any pending telemetry.
+            clientTelemetry.StopSenders();
+        }       
     }
 
     internal class PipelineArtifactDownloadParameters

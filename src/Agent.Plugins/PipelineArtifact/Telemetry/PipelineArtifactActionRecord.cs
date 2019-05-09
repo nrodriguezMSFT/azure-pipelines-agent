@@ -6,12 +6,12 @@ using Microsoft.VisualStudio.Services.BlobStore.WebApi.Telemetry;
 namespace Agent.Plugins.PipelineArtifact.Telemetry
 {
     /// <summary>
-    /// Generic telemetry record for use with Pipeline Artifact Action events.
+    /// Generic telemetry record for use with Pipeline Artifact events.
     /// </summary>
-    public class PipelineArtifactActionRecord : PipelineActionTelemetryRecord
+    public class PipelineArtifactActionRecord : PipelineTelemetryRecord
     {
-        public PipelineArtifactActionRecord(TelemetryInformationLevel level, Uri baseAddress, string clientType, string action, AgentTaskPluginExecutionContext context, uint attemptNumber = 1)
-            : base(level, baseAddress, clientType, action, context, attemptNumber)
+        public PipelineArtifactActionRecord(TelemetryInformationLevel level, Uri baseAddress, string eventNamePrefix, string eventNameSuffix, AgentTaskPluginExecutionContext context, uint attemptNumber = 1)
+            : base(level, baseAddress, eventNamePrefix, eventNameSuffix, context, attemptNumber)
         {
         }
     }
