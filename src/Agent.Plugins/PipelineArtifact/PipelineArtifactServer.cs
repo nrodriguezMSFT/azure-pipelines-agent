@@ -39,37 +39,37 @@ namespace Agent.Plugins.PipelineArtifact
             VssConnection connection = context.VssConnection;
             BlobStoreClientTelemetry clientTelemetry;
             DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection, out clientTelemetry);
-
-            //Upload the pipeline artifact.
-            PublishResult result;
-            PipelineArtifactActionRecord uploadRecord = clientTelemetry.CreateRecord<PipelineArtifactActionRecord>((level, uri, type) =>
-                new PipelineArtifactActionRecord(level, uri, type, nameof(UploadAsync), context));
-            try
+            
+            using (clientTelemetry)
             {
-                result = await clientTelemetry.MeasureActionAsync(
-                    record: uploadRecord,
-                    actionAsync: async () =>
-                    {
-                        return await dedupManifestClient.PublishAsync(source, cancellationToken);
-                    }
-                ).ConfigureAwait(false);
-            }
-            catch (Exception exception)
-            {
-                clientTelemetry.SendErrorTelemetry(exception, nameof(UploadAsync), name);                
-                throw;
-            }
+                //Upload the pipeline artifact.
+                PublishResult result;
+                PipelineArtifactActionRecord uploadRecord = clientTelemetry.CreateRecord<PipelineArtifactActionRecord>((level, uri, type) =>
+                    new PipelineArtifactActionRecord(level, uri, type, nameof(UploadAsync), context));
+                try
+                {
+                    result = await clientTelemetry.MeasureActionAsync(
+                        record: uploadRecord,
+                        actionAsync: async () =>
+                        {
+                            return await dedupManifestClient.PublishAsync(source, cancellationToken);
+                        }
+                    ).ConfigureAwait(false);
+                }
+                catch (Exception exception)
+                {
+                    clientTelemetry.SendErrorTelemetry(exception, nameof(UploadAsync), name);                
+                    throw;
+                }
 
-            // 2) associate the pipeline artifact with an build artifact
-            BuildServer buildHelper = new BuildServer(connection);
-            Dictionary<string, string> propertiesDictionary = new Dictionary<string, string>();
-            propertiesDictionary.Add(RootId, result.RootId.ValueString);
-            propertiesDictionary.Add(ProofNodes, StringUtil.ConvertToJson(result.ProofNodes.ToArray()));
-            var artifact = await buildHelper.AssociateArtifact(projectId, pipelineId, name, ArtifactResourceTypes.PipelineArtifact, result.ManifestId.ValueString, propertiesDictionary, cancellationToken);
-            context.Output(StringUtil.Loc("AssociateArtifactWithBuild", artifact.Id, pipelineId));
-
-            // Allow Telemetry Client to flush out any pending telemetry.
-            clientTelemetry.StopSenders();
+                // 2) associate the pipeline artifact with an build artifact
+                BuildServer buildHelper = new BuildServer(connection);
+                Dictionary<string, string> propertiesDictionary = new Dictionary<string, string>();
+                propertiesDictionary.Add(RootId, result.RootId.ValueString);
+                propertiesDictionary.Add(ProofNodes, StringUtil.ConvertToJson(result.ProofNodes.ToArray()));
+                var artifact = await buildHelper.AssociateArtifact(projectId, pipelineId, name, ArtifactResourceTypes.PipelineArtifact, result.ManifestId.ValueString, propertiesDictionary, cancellationToken);
+                context.Output(StringUtil.Loc("AssociateArtifactWithBuild", artifact.Id, pipelineId));
+            }
         }
 
         // Download pipeline artifact from Azure DevOps BlobStore service through DedupManifestArtifactClient to a target path
@@ -106,113 +106,113 @@ namespace Agent.Plugins.PipelineArtifact
             DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection, out clientTelemetry);
             BuildServer buildHelper = new BuildServer(connection);
             
-            // download all pipeline artifacts if artifact name is missing
-            if (downloadOptions == DownloadOptions.MultiDownload)
+            using (clientTelemetry)
             {
-                List<BuildArtifact> artifacts;
-                if (downloadParameters.ProjectRetrievalOptions == BuildArtifactRetrievalOptions.RetrieveByProjectId)
+                // download all pipeline artifacts if artifact name is missing
+                if (downloadOptions == DownloadOptions.MultiDownload)
                 {
-                    artifacts = await buildHelper.GetArtifactsAsync(downloadParameters.ProjectId, downloadParameters.PipelineId, cancellationToken);
-                }
-                else if (downloadParameters.ProjectRetrievalOptions == BuildArtifactRetrievalOptions.RetrieveByProjectName)
-                {
-                    if (string.IsNullOrEmpty(downloadParameters.ProjectName))
+                    List<BuildArtifact> artifacts;
+                    if (downloadParameters.ProjectRetrievalOptions == BuildArtifactRetrievalOptions.RetrieveByProjectId)
                     {
-                        throw new InvalidOperationException("Project name can't be empty when trying to fetch build artifacts!");
+                        artifacts = await buildHelper.GetArtifactsAsync(downloadParameters.ProjectId, downloadParameters.PipelineId, cancellationToken);
+                    }
+                    else if (downloadParameters.ProjectRetrievalOptions == BuildArtifactRetrievalOptions.RetrieveByProjectName)
+                    {
+                        if (string.IsNullOrEmpty(downloadParameters.ProjectName))
+                        {
+                            throw new InvalidOperationException("Project name can't be empty when trying to fetch build artifacts!");
+                        }
+                        else
+                        {
+                            artifacts = await buildHelper.GetArtifactsWithProjectNameAsync(downloadParameters.ProjectName, downloadParameters.PipelineId, cancellationToken);
+                        }
                     }
                     else
                     {
-                        artifacts = await buildHelper.GetArtifactsWithProjectNameAsync(downloadParameters.ProjectName, downloadParameters.PipelineId, cancellationToken);
+                        throw new InvalidOperationException("Unreachable code!");
+                    }
+
+                    IEnumerable<BuildArtifact> pipelineArtifacts = artifacts.Where(a => a.Resource.Type == PipelineArtifactTypeName);
+                    if (pipelineArtifacts.Count() == 0)
+                    {
+                        throw new ArgumentException("Could not find any pipeline artifacts in the build.");
+                    }
+                    else
+                    {
+                        context.Output(StringUtil.Loc("DownloadingMultiplePipelineArtifacts", pipelineArtifacts.Count()));
+
+                        var artifactNameAndManifestIds = pipelineArtifacts.ToDictionary(
+                            keySelector: (a) => a.Name, // keys should be unique, if not something is really wrong
+                            elementSelector: (a) => DedupIdentifier.Create(a.Resource.Data));
+                        // 2) download to the target path
+                        var options = DownloadPipelineArtifactOptions.CreateWithMultiManifestIds(
+                            artifactNameAndManifestIds,
+                            downloadParameters.TargetDirectory,
+                            proxyUri: null,
+                            minimatchPatterns: downloadParameters.MinimatchFilters);
+
+                        PipelineArtifactActionRecord blobStoreRecord = clientTelemetry.CreateRecord<PipelineArtifactActionRecord>((level, uri, type) =>
+                            new PipelineArtifactActionRecord(level, uri, type, nameof(DownloadAsync), context));
+                        try
+                        {
+                            await clientTelemetry.MeasureActionAsync(
+                                record: blobStoreRecord,
+                                actionAsync: async () =>
+                                {
+                                    await dedupManifestClient.DownloadAsync(options, cancellationToken);
+                                }).ConfigureAwait(false);
+                        }
+                        catch (Exception exception)
+                        {
+                            clientTelemetry.SendErrorTelemetry(exception, nameof(DownloadAsync));
+                        }
                     }
                 }
-                else
+                else if (downloadOptions == DownloadOptions.SingleDownload)
                 {
-                    throw new InvalidOperationException("Unreachable code!");
-                }
+                    // 1) get manifest id from artifact data
+                    BuildArtifact buildArtifact;
+                    if (downloadParameters.ProjectRetrievalOptions == BuildArtifactRetrievalOptions.RetrieveByProjectId)
+                    {
+                        buildArtifact = await buildHelper.GetArtifact(downloadParameters.ProjectId, downloadParameters.PipelineId, downloadParameters.ArtifactName, cancellationToken);
+                    }
+                    else if (downloadParameters.ProjectRetrievalOptions == BuildArtifactRetrievalOptions.RetrieveByProjectName)
+                    {
+                        if (string.IsNullOrEmpty(downloadParameters.ProjectName))
+                        {
+                            throw new InvalidOperationException("Project name can't be empty when trying to fetch build artifacts!");
+                        }
+                        else
+                        {
+                            buildArtifact = await buildHelper.GetArtifactWithProjectNameAsync(downloadParameters.ProjectName, downloadParameters.PipelineId, downloadParameters.ArtifactName, cancellationToken);
+                        }
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Unreachable code!");
+                    }
 
-                IEnumerable<BuildArtifact> pipelineArtifacts = artifacts.Where(a => a.Resource.Type == PipelineArtifactTypeName);
-                if (pipelineArtifacts.Count() == 0)
-                {
-                    throw new ArgumentException("Could not find any pipeline artifacts in the build.");
-                }
-                else
-                {
-                    context.Output(StringUtil.Loc("DownloadingMultiplePipelineArtifacts", pipelineArtifacts.Count()));
-
-                    var artifactNameAndManifestIds = pipelineArtifacts.ToDictionary(
-                        keySelector: (a) => a.Name, // keys should be unique, if not something is really wrong
-                        elementSelector: (a) => DedupIdentifier.Create(a.Resource.Data));
-                    // 2) download to the target path
-                    var options = DownloadPipelineArtifactOptions.CreateWithMultiManifestIds(
-                        artifactNameAndManifestIds,
+                    var manifestId = DedupIdentifier.Create(buildArtifact.Resource.Data);
+                    var options = DownloadPipelineArtifactOptions.CreateWithManifestId(
+                        manifestId,
                         downloadParameters.TargetDirectory,
                         proxyUri: null,
                         minimatchPatterns: downloadParameters.MinimatchFilters);
-
+                    
                     PipelineArtifactActionRecord blobStoreRecord = clientTelemetry.CreateRecord<PipelineArtifactActionRecord>((level, uri, type) =>
-                        new PipelineArtifactActionRecord(level, uri, type, nameof(DownloadAsync), context));
-                    try
-                    {
-                        await clientTelemetry.MeasureActionAsync(
-                            record: blobStoreRecord,
-                            actionAsync: async () =>
-                            {
-                                await dedupManifestClient.DownloadAsync(options, cancellationToken);
-                            }).ConfigureAwait(false);
-                    }
-                    catch (Exception exception)
-                    {
-                        clientTelemetry.SendErrorTelemetry(exception, nameof(DownloadAsync));
-                    }
-                }
-            }
-            else if (downloadOptions == DownloadOptions.SingleDownload)
-            {
-                // 1) get manifest id from artifact data
-                BuildArtifact buildArtifact;
-                if (downloadParameters.ProjectRetrievalOptions == BuildArtifactRetrievalOptions.RetrieveByProjectId)
-                {
-                    buildArtifact = await buildHelper.GetArtifact(downloadParameters.ProjectId, downloadParameters.PipelineId, downloadParameters.ArtifactName, cancellationToken);
-                }
-                else if (downloadParameters.ProjectRetrievalOptions == BuildArtifactRetrievalOptions.RetrieveByProjectName)
-                {
-                    if (string.IsNullOrEmpty(downloadParameters.ProjectName))
-                    {
-                        throw new InvalidOperationException("Project name can't be empty when trying to fetch build artifacts!");
-                    }
-                    else
-                    {
-                        buildArtifact = await buildHelper.GetArtifactWithProjectNameAsync(downloadParameters.ProjectName, downloadParameters.PipelineId, downloadParameters.ArtifactName, cancellationToken);
-                    }
+                            new PipelineArtifactActionRecord(level, uri, type, nameof(DownloadAsync), context));
+                    await clientTelemetry.MeasureActionAsync(
+                        record: blobStoreRecord,
+                        actionAsync: async () =>
+                        {
+                            await dedupManifestClient.DownloadAsync(options, cancellationToken);
+                        });
                 }
                 else
                 {
                     throw new InvalidOperationException("Unreachable code!");
                 }
-
-                var manifestId = DedupIdentifier.Create(buildArtifact.Resource.Data);
-                var options = DownloadPipelineArtifactOptions.CreateWithManifestId(
-                    manifestId,
-                    downloadParameters.TargetDirectory,
-                    proxyUri: null,
-                    minimatchPatterns: downloadParameters.MinimatchFilters);
-                
-                PipelineArtifactActionRecord blobStoreRecord = clientTelemetry.CreateRecord<PipelineArtifactActionRecord>((level, uri, type) =>
-                        new PipelineArtifactActionRecord(level, uri, type, nameof(DownloadAsync), context));
-                await clientTelemetry.MeasureActionAsync(
-                    record: blobStoreRecord,
-                    actionAsync: async () =>
-                    {
-                        await dedupManifestClient.DownloadAsync(options, cancellationToken);
-                    });
             }
-            else
-            {
-                throw new InvalidOperationException("Unreachable code!");
-            }
-            
-            // Allow Telemetry Client to flush out any pending telemetry.
-            clientTelemetry.StopSenders();
         }       
     }
 
