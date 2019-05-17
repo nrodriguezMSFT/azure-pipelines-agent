@@ -5,12 +5,14 @@ using System.Threading.Tasks;
 using System.Threading;
 using System;
 using Agent.Plugins.PipelineArtifact;
+using Agent.Plugins.PipelineArtifact.Telemetry;
 using Agent.Sdk;
 using Microsoft.TeamFoundation.Build.WebApi;
 using Microsoft.TeamFoundation.DistributedTask.WebApi;
 using Microsoft.VisualStudio.Services.Agent.Util;
 using Microsoft.VisualStudio.Services.BlobStore.Common;
 using Microsoft.VisualStudio.Services.BlobStore.WebApi;
+using Microsoft.VisualStudio.Services.BlobStore.WebApi.Telemetry;
 using Microsoft.VisualStudio.Services.Content.Common;
 using Microsoft.VisualStudio.Services.Common;
 using Microsoft.VisualStudio.Services.Content.Common.Tracing;
@@ -24,6 +26,8 @@ namespace Agent.Plugins.PipelineCache
     {
         public const string RootId = "RootId";
         public const string ProofNodes = "ProofNodes";
+        public const string SaveCache = "SaveCache";
+        public const string RestoreCache = "RestoreCache";
         private const string PipelineCacheVarPrefix = "PipelineCache";
 
         internal async Task UploadAsync(
@@ -34,25 +38,48 @@ namespace Agent.Plugins.PipelineCache
             CancellationToken cancellationToken)
         {
             VssConnection connection = context.VssConnection;
-            DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection);
+            BlobStoreClientTelemetry clientTelemetry;
+            DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection, out clientTelemetry);
 
-            var result = await dedupManifestClient.PublishAsync(path, cancellationToken);
-            var scope = "myscope";
-
-            CreatePipelineCacheArtifactOptions options = new CreatePipelineCacheArtifactOptions
+            using (clientTelemetry)
             {
-                Key = key,
-                RootId = result.RootId,
-                ManifestId = result.ManifestId,
-                Scope = scope,
-                ProofNodes = result.ProofNodes.ToArray(),
-                Salt = salt
-            };
+                string scope = "myscope";
+                //Upload the pipeline artifact.
+                PipelineCachingActionRecord uploadRecord = clientTelemetry.CreateRecord<PipelineCachingActionRecord>((level, uri, type) =>
+                    new PipelineCachingActionRecord(level, uri, type, nameof(dedupManifestClient.PublishAsync), context));
+                PublishResult result = await clientTelemetry.MeasureActionAsync(
+                    record: uploadRecord,
+                    actionAsync: async () =>
+                    {
+                        return await dedupManifestClient.PublishAsync(path, cancellationToken);
+                    }
+                ).ConfigureAwait(false);
 
-            var pipelineCacheClient = this.CreateClient(context, connection);
-            await pipelineCacheClient.CreatePipelineCacheArtifactAsync(options, cancellationToken);
+                CreatePipelineCacheArtifactOptions options = new CreatePipelineCacheArtifactOptions
+                {
+                    Key = key,
+                    RootId = result.RootId,
+                    ManifestId = result.ManifestId,
+                    Scope = scope,
+                    ProofNodes = result.ProofNodes.ToArray(),
+                    Salt = salt
+                };
 
-            Console.WriteLine("Saved item.");
+                // Cache the artifact
+                // TODO: Determine what telemetry needs to be captured from inside the PipelineCacheClient
+                // and if telemetry instance needs to be passed through
+                PipelineCacheClient pipelineCacheClient = this.CreateClient(context, connection);
+                PipelineCachingActionRecord cachingRecord = clientTelemetry.CreateRecord<PipelineCachingActionRecord>((level, uri, type) =>
+                    new PipelineCachingActionRecord(level, uri, type, SaveCache, context));
+                await clientTelemetry.MeasureActionAsync(
+                    record: cachingRecord,
+                    actionAsync: async () =>
+                    {
+                        await pipelineCacheClient.CreatePipelineCacheArtifactAsync(options, cancellationToken);
+                    }
+                ).ConfigureAwait(false);
+                context.Output("Saved item.");
+            }
         }
 
         internal async Task DownloadAsync(
@@ -64,6 +91,9 @@ namespace Agent.Plugins.PipelineCache
             CancellationToken cancellationToken)
         {
             VssConnection connection = context.VssConnection;
+            
+            BlobStoreClientTelemetry clientTelemetry;
+            DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection, out clientTelemetry);
             var pipelineCacheClient = this.CreateClient(context, connection);
 
             GetPipelineCacheArtifactOptions options = new GetPipelineCacheArtifactOptions
@@ -72,19 +102,43 @@ namespace Agent.Plugins.PipelineCache
                 Scope = "myscope",
                 Salt = salt,
             };
+            
+            PipelineCachingActionRecord cachingRecord = clientTelemetry.CreateRecord<PipelineCachingActionRecord>((level, uri, type) =>
+                    new PipelineCachingActionRecord(level, uri, type, RestoreCache, context));
+            PipelineCacheArtifact result = await clientTelemetry.MeasureActionAsync(
+                record: cachingRecord,
+                actionAsync: async () =>
+                {
+                    return await pipelineCacheClient.GetPipelineCacheArtifactAsync(options, cancellationToken);
+                }
+            ).ConfigureAwait(false);
 
-            var result = await pipelineCacheClient.GetPipelineCacheArtifactAsync(options, cancellationToken);
             if (result == null)
             {
                 return;
             }
             else
             {
-                Console.WriteLine("Manifest ID is: {0}", result.ManifestId.ValueString);
-                DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection);
-                await this.DownloadPipelineCacheAsync(dedupManifestClient, result.ManifestId, path, cancellationToken);
+                context.Output($"Manifest ID is: {result.ManifestId.ValueString}");
+                PipelineCachingActionRecord downloadRecord = clientTelemetry.CreateRecord<PipelineCachingActionRecord>((level, uri, type) =>
+                    new PipelineCachingActionRecord(level, uri, type, nameof(DownloadAsync), context));
+                try
+                {
+                    await clientTelemetry.MeasureActionAsync(
+                        record: downloadRecord,
+                        actionAsync: async () =>
+                        {
+                            await this.DownloadPipelineCacheAsync(dedupManifestClient, result.ManifestId, path, cancellationToken);
+                        }
+                    ).ConfigureAwait(false);
+                }
+                catch (Exception exception)
+                {
+                    clientTelemetry.SendErrorTelemetry(exception, nameof(DownloadAsync));
+                    throw;
+                }                
                 context.SetVariable($"{PipelineCacheVarPrefix}.{variableToSetOnHit}", "True");
-                Console.WriteLine("Cache restored.");
+                context.Output("Cache restored.");
             }
         }
 
