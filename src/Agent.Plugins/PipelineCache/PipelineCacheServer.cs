@@ -43,7 +43,6 @@ namespace Agent.Plugins.PipelineCache
 
             using (clientTelemetry)
             {
-                string scope = "myscope";
                 //Upload the pipeline artifact.
                 PipelineCachingActionRecord uploadRecord = clientTelemetry.CreateRecord<PipelineCachingActionRecord>((level, uri, type) =>
                     new PipelineCachingActionRecord(level, uri, type, nameof(dedupManifestClient.PublishAsync), context));
@@ -60,7 +59,6 @@ namespace Agent.Plugins.PipelineCache
                     Key = key,
                     RootId = result.RootId,
                     ManifestId = result.ManifestId,
-                    Scope = scope,
                     ProofNodes = result.ProofNodes.ToArray(),
                     Salt = salt
                 };
@@ -99,7 +97,6 @@ namespace Agent.Plugins.PipelineCache
             GetPipelineCacheArtifactOptions options = new GetPipelineCacheArtifactOptions
             {
                 Key = key,
-                Scope = "myscope",
                 Salt = salt,
             };
             
@@ -137,8 +134,11 @@ namespace Agent.Plugins.PipelineCache
                     clientTelemetry.SendErrorTelemetry(exception, nameof(DownloadAsync));
                     throw;
                 }                
-                context.SetVariable($"{PipelineCacheVarPrefix}.{variableToSetOnHit}", "True");
-                context.Output("Cache restored.");
+                if (!string.IsNullOrEmpty(variableToSetOnHit))
+                {
+                    context.SetVariable($"{PipelineCacheVarPrefix}.{variableToSetOnHit}", "True");
+                }
+                Console.WriteLine("Cache restored.");
             }
         }
 

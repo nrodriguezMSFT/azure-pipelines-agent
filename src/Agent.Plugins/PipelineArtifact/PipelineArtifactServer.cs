@@ -26,6 +26,7 @@ namespace Agent.Plugins.PipelineArtifact
         public static readonly string RootId = "RootId";
         public static readonly string ProofNodes = "ProofNodes";
         public const string PipelineArtifactTypeName = "PipelineArtifact";
+        public const string BuildArtifactTypeName = "Container";
 
         // Upload from target path to Azure DevOps BlobStore service through DedupManifestArtifactClient, then associate it with the build
         internal async Task UploadAsync(
@@ -95,7 +96,7 @@ namespace Agent.Plugins.PipelineArtifact
             return this.DownloadAsync(context, downloadParameters, DownloadOptions.SingleDownload, cancellationToken);
         }
 
-        // Download with minimatch patterns.
+        // Download with minimatch patterns, V1.
         internal async Task DownloadAsync(
             AgentTaskPluginExecutionContext context,
             PipelineArtifactDownloadParameters downloadParameters,
@@ -226,7 +227,105 @@ namespace Agent.Plugins.PipelineArtifact
                     throw new InvalidOperationException("Unreachable code!");
                 }
             }
-        }       
+        }
+
+        // Download for version 2. This decision was made because version 1 is sealed and we didn't want to break any existing customers.
+        internal async Task DownloadAsyncV2(
+            AgentTaskPluginExecutionContext context,
+            PipelineArtifactDownloadParameters downloadParameters,
+            DownloadOptions downloadOptions,
+            CancellationToken cancellationToken)
+        {
+            VssConnection connection = context.VssConnection;
+            BuildServer buildHelper = new BuildServer(connection);
+
+            // download all pipeline artifacts if artifact name is missing
+            if (downloadOptions == DownloadOptions.MultiDownload)
+            {
+                List<BuildArtifact> artifacts;
+                if (downloadParameters.ProjectRetrievalOptions == BuildArtifactRetrievalOptions.RetrieveByProjectId)
+                {
+                    artifacts = await buildHelper.GetArtifactsAsync(downloadParameters.ProjectId, downloadParameters.PipelineId, cancellationToken);
+                }
+                else if (downloadParameters.ProjectRetrievalOptions == BuildArtifactRetrievalOptions.RetrieveByProjectName)
+                {
+                    if (string.IsNullOrEmpty(downloadParameters.ProjectName))
+                    {
+                        throw new InvalidOperationException("Project name can't be empty when trying to fetch build artifacts!");
+                    }
+                    else
+                    {
+                        artifacts = await buildHelper.GetArtifactsWithProjectNameAsync(downloadParameters.ProjectName, downloadParameters.PipelineId, cancellationToken);
+                    }
+                }
+                else
+                {
+                    throw new InvalidOperationException("Unreachable code!");
+                }
+
+                IEnumerable<BuildArtifact> buildArtifacts = artifacts.Where(a => a.Resource.Type == BuildArtifactTypeName);
+                IEnumerable<BuildArtifact> pipelineArtifacts = artifacts.Where(a => a.Resource.Type == PipelineArtifactTypeName);
+                if (buildArtifacts.Any())
+                {
+                    FileContainerProvider provider = new FileContainerProvider(connection, this.CreateTracer(context));
+                    await provider.DownloadMultipleArtifactsAsync(downloadParameters, buildArtifacts, cancellationToken);
+                }
+
+                if (pipelineArtifacts.Any())
+                {
+                    PipelineArtifactProvider provider = new PipelineArtifactProvider(context, connection, this.CreateTracer(context));
+                    await provider.DownloadMultipleArtifactsAsync(downloadParameters, pipelineArtifacts, cancellationToken);
+                }
+            }
+            else if (downloadOptions == DownloadOptions.SingleDownload)
+            {
+                // 1) get manifest id from artifact data
+                BuildArtifact buildArtifact;
+                if (downloadParameters.ProjectRetrievalOptions == BuildArtifactRetrievalOptions.RetrieveByProjectId)
+                {
+                    buildArtifact = await buildHelper.GetArtifact(downloadParameters.ProjectId, downloadParameters.PipelineId, downloadParameters.ArtifactName, cancellationToken);
+                }
+                else if (downloadParameters.ProjectRetrievalOptions == BuildArtifactRetrievalOptions.RetrieveByProjectName)
+                {
+                    if (string.IsNullOrEmpty(downloadParameters.ProjectName))
+                    {
+                        throw new InvalidOperationException("Project name can't be empty when trying to fetch build artifacts!");
+                    }
+                    else
+                    {
+                        buildArtifact = await buildHelper.GetArtifactWithProjectNameAsync(downloadParameters.ProjectName, downloadParameters.PipelineId, downloadParameters.ArtifactName, cancellationToken);
+                    }
+                }
+                else
+                {
+                    throw new InvalidOperationException("Unreachable code!");
+                }
+
+                ArtifactProviderFactory factory = new ArtifactProviderFactory(context, connection, this.CreateTracer(context));
+                IArtifactProvider provider = factory.GetProvider(buildArtifact);
+                await provider.DownloadSingleArtifactAsync(downloadParameters, buildArtifact, cancellationToken);
+            }
+            else
+            {
+                throw new InvalidOperationException("Unreachable code!");
+            }
+        }
+
+        private BuildDropManager CreateBulidDropManager(AgentTaskPluginExecutionContext context, VssConnection connection)
+        {
+            var dedupStoreHttpClient = connection.GetClient<DedupStoreHttpClient>();
+            var tracer = this.CreateTracer(context);
+            dedupStoreHttpClient.SetTracer(tracer);
+            var client = new DedupStoreClientWithDataport(dedupStoreHttpClient, 16 * Environment.ProcessorCount);
+            var buildDropManager = new BuildDropManager(client, tracer);
+            return buildDropManager;
+        }
+
+        private CallbackAppTraceSource CreateTracer(AgentTaskPluginExecutionContext context)
+        {
+            var tracer = new CallbackAppTraceSource(str => context.Output(str), System.Diagnostics.SourceLevels.Information);
+            return tracer;
+        }
     }
 
     internal class PipelineArtifactDownloadParameters
