@@ -69,11 +69,11 @@ namespace Agent.Plugins.PipelineCache
                 PipelineCacheClient pipelineCacheClient = this.CreateClient(context, connection);
                 PipelineCachingActionRecord cachingRecord = clientTelemetry.CreateRecord<PipelineCachingActionRecord>((level, uri, type) =>
                     new PipelineCachingActionRecord(level, uri, type, SaveCache, context));
-                await clientTelemetry.MeasureActionAsync(
+                CreateStatus status = await clientTelemetry.MeasureActionAsync(
                     record: cachingRecord,
                     actionAsync: async () =>
                     {
-                        await pipelineCacheClient.CreatePipelineCacheArtifactAsync(options, cancellationToken);
+                        return await pipelineCacheClient.CreatePipelineCacheArtifactAsync(options, cancellationToken);
                     }
                 ).ConfigureAwait(false);
                 context.Output("Saved item.");
@@ -119,21 +119,13 @@ namespace Agent.Plugins.PipelineCache
                 context.Output($"Manifest ID is: {result.ManifestId.ValueString}");
                 PipelineCachingActionRecord downloadRecord = clientTelemetry.CreateRecord<PipelineCachingActionRecord>((level, uri, type) =>
                     new PipelineCachingActionRecord(level, uri, type, nameof(DownloadAsync), context));
-                try
-                {
-                    await clientTelemetry.MeasureActionAsync(
-                        record: downloadRecord,
-                        actionAsync: async () =>
-                        {
-                            await this.DownloadPipelineCacheAsync(dedupManifestClient, result.ManifestId, path, cancellationToken);
-                        }
-                    ).ConfigureAwait(false);
-                }
-                catch (Exception exception)
-                {
-                    clientTelemetry.SendErrorTelemetry(exception, nameof(DownloadAsync));
-                    throw;
-                }                
+                await clientTelemetry.MeasureActionAsync(
+                    record: downloadRecord,
+                    actionAsync: async () =>
+                    {
+                        await this.DownloadPipelineCacheAsync(dedupManifestClient, result.ManifestId, path, cancellationToken);
+                    }
+                ).ConfigureAwait(false);
                 if (!string.IsNullOrEmpty(variableToSetOnHit))
                 {
                     context.SetVariable($"{PipelineCacheVarPrefix}.{variableToSetOnHit}", "True");
