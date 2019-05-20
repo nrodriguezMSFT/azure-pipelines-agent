@@ -6,6 +6,7 @@ using System.Threading;
 using System;
 using Agent.Plugins.PipelineArtifact;
 using Agent.Plugins.PipelineArtifact.Telemetry;
+using Agent.Plugins.PipelineCache.Telemetry;
 using Agent.Sdk;
 using Microsoft.TeamFoundation.Build.WebApi;
 using Microsoft.TeamFoundation.DistributedTask.WebApi;
@@ -44,8 +45,8 @@ namespace Agent.Plugins.PipelineCache
             using (clientTelemetry)
             {
                 //Upload the pipeline artifact.
-                PipelineCachingActionRecord uploadRecord = clientTelemetry.CreateRecord<PipelineCachingActionRecord>((level, uri, type) =>
-                    new PipelineCachingActionRecord(level, uri, type, nameof(dedupManifestClient.PublishAsync), context));
+                PipelineCacheActionRecord uploadRecord = clientTelemetry.CreateRecord<PipelineCacheActionRecord>((level, uri, type) =>
+                    new PipelineCacheActionRecord(level, uri, type, nameof(dedupManifestClient.PublishAsync), context));
                 PublishResult result = await clientTelemetry.MeasureActionAsync(
                     record: uploadRecord,
                     actionAsync: async () =>
@@ -64,13 +65,11 @@ namespace Agent.Plugins.PipelineCache
                 };
 
                 // Cache the artifact
-                // TODO: Determine what telemetry needs to be captured from inside the PipelineCacheClient
-                // and if telemetry instance needs to be passed through
                 PipelineCacheClient pipelineCacheClient = this.CreateClient(context, connection);
-                PipelineCachingActionRecord cachingRecord = clientTelemetry.CreateRecord<PipelineCachingActionRecord>((level, uri, type) =>
-                    new PipelineCachingActionRecord(level, uri, type, SaveCache, context));
+                PipelineCacheActionRecord cacheRecord = clientTelemetry.CreateRecord<PipelineCacheActionRecord>((level, uri, type) =>
+                    new PipelineCacheActionRecord(level, uri, type, SaveCache, context));
                 CreateStatus status = await clientTelemetry.MeasureActionAsync(
-                    record: cachingRecord,
+                    record: cacheRecord,
                     actionAsync: async () =>
                     {
                         return await pipelineCacheClient.CreatePipelineCacheArtifactAsync(options, cancellationToken);
@@ -100,37 +99,40 @@ namespace Agent.Plugins.PipelineCache
                 Salt = salt,
             };
             
-            PipelineCachingActionRecord cachingRecord = clientTelemetry.CreateRecord<PipelineCachingActionRecord>((level, uri, type) =>
-                    new PipelineCachingActionRecord(level, uri, type, RestoreCache, context));
-            PipelineCacheArtifact result = await clientTelemetry.MeasureActionAsync(
-                record: cachingRecord,
-                actionAsync: async () =>
+            using (clientTelemetry)
                 {
-                    return await pipelineCacheClient.GetPipelineCacheArtifactAsync(options, cancellationToken);
-                }
-            ).ConfigureAwait(false);
-
-            if (result == null)
-            {
-                return;
-            }
-            else
-            {
-                context.Output($"Manifest ID is: {result.ManifestId.ValueString}");
-                PipelineCachingActionRecord downloadRecord = clientTelemetry.CreateRecord<PipelineCachingActionRecord>((level, uri, type) =>
-                    new PipelineCachingActionRecord(level, uri, type, nameof(DownloadAsync), context));
-                await clientTelemetry.MeasureActionAsync(
-                    record: downloadRecord,
+                PipelineCacheActionRecord cacheRecord = clientTelemetry.CreateRecord<PipelineCacheActionRecord>((level, uri, type) =>
+                        new PipelineCacheActionRecord(level, uri, type, RestoreCache, context));
+                PipelineCacheArtifact result = await clientTelemetry.MeasureActionAsync(
+                    record: cacheRecord,
                     actionAsync: async () =>
                     {
-                        await this.DownloadPipelineCacheAsync(dedupManifestClient, result.ManifestId, path, cancellationToken);
+                        return await pipelineCacheClient.GetPipelineCacheArtifactAsync(options, cancellationToken);
                     }
                 ).ConfigureAwait(false);
-                if (!string.IsNullOrEmpty(variableToSetOnHit))
+
+                if (result == null)
                 {
-                    context.SetVariable($"{PipelineCacheVarPrefix}.{variableToSetOnHit}", "True");
+                    return;
                 }
-                Console.WriteLine("Cache restored.");
+                else
+                {
+                    context.Output($"Manifest ID is: {result.ManifestId.ValueString}");
+                    PipelineCacheActionRecord downloadRecord = clientTelemetry.CreateRecord<PipelineCacheActionRecord>((level, uri, type) =>
+                        new PipelineCacheActionRecord(level, uri, type, nameof(DownloadAsync), context));
+                    await clientTelemetry.MeasureActionAsync(
+                        record: downloadRecord,
+                        actionAsync: async () =>
+                        {
+                            await this.DownloadPipelineCacheAsync(dedupManifestClient, result.ManifestId, path, cancellationToken);
+                        }
+                    ).ConfigureAwait(false);
+                    if (!string.IsNullOrEmpty(variableToSetOnHit))
+                    {
+                        context.SetVariable($"{PipelineCacheVarPrefix}.{variableToSetOnHit}", "True");
+                    }
+                    Console.WriteLine("Cache restored.");
+                }
             }
         }
 
