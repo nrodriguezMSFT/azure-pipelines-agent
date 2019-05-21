@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.TeamFoundation.DistributedTask.WebApi;
 using Microsoft.VisualStudio.Services.Agent.Util;
 using Microsoft.VisualStudio.Services.Common;
+using Microsoft.VisualStudio.Services.Content.Common.Telemetry;
 using Microsoft.VisualStudio.Services.WebApi;
 using Newtonsoft.Json;
 using Pipelines = Microsoft.TeamFoundation.DistributedTask.Pipelines;
@@ -168,7 +169,13 @@ namespace Agent.Sdk
             string propertiesAsJson = StringUtil.ConvertToJson(properties, Formatting.None);
 
             Output($"##vso[telemetry.publish area={area};feature={feature}]{Escape(propertiesAsJson)}");
-        }           
+        }
+        
+        public void PublishTelemetry(string area, string feature, TelemetryRecord record)
+        {
+            string recordAsJson = JsonConvert.SerializeObject(record);
+            Output($"##vso[telemetry.publish area={area};feature={feature}]{recordAsJson}");
+        }
 
         public void Output(string message)
         {

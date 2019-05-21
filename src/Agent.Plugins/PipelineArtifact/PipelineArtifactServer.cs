@@ -53,16 +53,8 @@ namespace Agent.Plugins.PipelineArtifact
                         return await dedupManifestClient.PublishAsync(source, cancellationToken);
                     }
                 ).ConfigureAwait(false);
-
-                context.Output($"[Nick - PAS] | (Single Upload) Attempting to publish telemetry via context.PublishTelemetry, current record ms {uploadRecord.ActionDurationMs}");
-                context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineArtifact", properties: new Dictionary<string, string>
-                    {
-                        { "test", "hit"},
-                        { "time", $"{uploadRecord.ActionDurationMs}"}
-                    });
-                string uploadRecordJson = JsonConvert.SerializeObject(uploadRecord);
-                context.Output($"[Nick - PAS] | (Single Upload) Attempting to publish telemetry via output, current record as json {uploadRecordJson}");
-                context.Output($"##vso[telemetry.publish area=AzurePipelinesAgent;feature=PipelineArtifact]{uploadRecordJson}");  
+                // Send results to CustomerIntelligence
+                context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineArtifact", record: uploadRecord);
        
                 // 2) associate the pipeline artifact with an build artifact
                 BuildServer buildHelper = new BuildServer(connection);
@@ -153,24 +145,17 @@ namespace Agent.Plugins.PipelineArtifact
                             proxyUri: null,
                             minimatchPatterns: downloadParameters.MinimatchFilters);
 
-                        PipelineArtifactActionRecord blobStoreRecord = clientTelemetry.CreateRecord<PipelineArtifactActionRecord>((level, uri, type) =>
+                        PipelineArtifactActionRecord downloadRecord = clientTelemetry.CreateRecord<PipelineArtifactActionRecord>((level, uri, type) =>
                             new PipelineArtifactActionRecord(level, uri, type, nameof(DownloadAsync), context));
                         await clientTelemetry.MeasureActionAsync(
-                            record: blobStoreRecord,
+                            record: downloadRecord,
                             actionAsync: async () =>
                             {
                                 await dedupManifestClient.DownloadAsync(options, cancellationToken);
                             }).ConfigureAwait(false);
-                        context.Output($"[Nick - PAS] | (Multi Download) Attempting to publish telemetry via context.PublishTelemetry, current record ms {blobStoreRecord.ActionDurationMs}");
-                        context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineArtifact", properties: new Dictionary<string, string>
-                        {
-                            { "test", "hit"},
-                            { "time", $"{blobStoreRecord.ActionDurationMs}"}
-                        });
-                        string blobStoreRecordJson = JsonConvert.SerializeObject(blobStoreRecord);
-                        context.Output($"[Nick - PAS] | (Multi Download) Attempting to publish telemetry via output, current record as json {blobStoreRecordJson}");
-                        context.Output($"##vso[telemetry.publish area=AzurePipelinesAgent;feature=PipelineArtifact]{blobStoreRecordJson}");
-                    }
+                        // Send results to CustomerIntelligence
+                        context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineArtifact", record: downloadRecord);  
+                        }
                 }
                 else if (downloadOptions == DownloadOptions.SingleDownload)
                 {
@@ -203,24 +188,16 @@ namespace Agent.Plugins.PipelineArtifact
                         proxyUri: null,
                         minimatchPatterns: downloadParameters.MinimatchFilters);
                     
-                    PipelineArtifactActionRecord blobStoreRecord = clientTelemetry.CreateRecord<PipelineArtifactActionRecord>((level, uri, type) =>
+                    PipelineArtifactActionRecord downloadRecord = clientTelemetry.CreateRecord<PipelineArtifactActionRecord>((level, uri, type) =>
                             new PipelineArtifactActionRecord(level, uri, type, nameof(DownloadAsync), context));
                     await clientTelemetry.MeasureActionAsync(
-                        record: blobStoreRecord,
+                        record: downloadRecord,
                         actionAsync: async () =>
                         {
                             await dedupManifestClient.DownloadAsync(options, cancellationToken);                            
                         });
-
-                    context.Output($"[Nick - PAS] | (Single Download) Attempting to publish telemetry via context.PublishTelemetry, current record ms {blobStoreRecord.ActionDurationMs}");
-                    context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineArtifact", properties: new Dictionary<string, string>
-                        {
-                            { "test", "hit"},
-                            { "time", $"{blobStoreRecord.ActionDurationMs}"}
-                        });
-                    string blobStoreRecordJson = JsonConvert.SerializeObject(blobStoreRecord);
-                    context.Output($"[Nick - PAS] | (Single Download) Attempting to publish telemetry via output, current record as json {blobStoreRecordJson}");
-                    context.Output($"##vso[telemetry.publish area=AzurePipelinesAgent;feature=PipelineArtifact]{blobStoreRecordJson}");
+                    // Send results to CustomerIntelligence
+                    context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineArtifact", record: downloadRecord);  
                 }
                 else
                 {
