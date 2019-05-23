@@ -29,7 +29,7 @@ namespace Agent.Plugins.PipelineCache.Telemetry
         {
         }
 
-        protected override void SetReturnedProperty<T>(T value)
+        protected override void SetMeasuredActionResult<T>(T value)
         {
             if (value == null)
             {

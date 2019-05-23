@@ -19,7 +19,7 @@ namespace Agent.Plugins.PipelineArtifact.Telemetry
         {
         }
 
-        protected override void SetReturnedProperty<T>(T value)
+        protected override void SetMeasuredActionResult<T>(T value)
         {
             string valueType = value.GetType().ToString();
             switch (valueType)
