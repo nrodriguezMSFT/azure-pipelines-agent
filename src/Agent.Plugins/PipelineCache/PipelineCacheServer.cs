@@ -25,10 +25,10 @@ namespace Agent.Plugins.PipelineCache
 {    
     public class PipelineCacheServer
     {
-        public const string RootId = "RootId";
         public const string ProofNodes = "ProofNodes";
-        public const string SaveCache = "SaveCache";
         public const string RestoreCache = "RestoreCache";
+        public const string RootId = "RootId";
+        public const string SaveCache = "SaveCache";
         private const string PipelineCacheVarPrefix = "PipelineCache";
 
         internal async Task UploadAsync(
@@ -90,7 +90,6 @@ namespace Agent.Plugins.PipelineCache
             CancellationToken cancellationToken)
         {
             VssConnection connection = context.VssConnection;
-            
             BlobStoreClientTelemetry clientTelemetry;
             DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection, out clientTelemetry);
             var pipelineCacheClient = this.CreateClient(context, connection);

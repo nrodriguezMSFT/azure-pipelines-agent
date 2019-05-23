@@ -8,7 +8,6 @@ using Microsoft.VisualStudio.Services.PipelineCache.WebApi;
 
 namespace Agent.Plugins.PipelineCache.Telemetry
 {
-    
     /// <summary>
     /// Generic telemetry record for use with Pipeline Caching events.
     /// </summary>
@@ -22,7 +21,6 @@ namespace Agent.Plugins.PipelineCache.Telemetry
         private const string CreateStatusTypeName = "CreateStatus";
         private const string PipelineCacheArtifactTypeName = "PipelineCacheArtifact";
         private const string PublishResultTypeName = "PublishResult";
-
 
         public PipelineCacheActionRecord(TelemetryInformationLevel level, Uri baseAddress, string eventNamePrefix, string eventNameSuffix, AgentTaskPluginExecutionContext context, uint attemptNumber = 1)
             : base(level, baseAddress, eventNamePrefix, eventNameSuffix, context, attemptNumber)
