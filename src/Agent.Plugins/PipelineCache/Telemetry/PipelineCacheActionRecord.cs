@@ -14,7 +14,7 @@ namespace Agent.Plugins.PipelineCache.Telemetry
     public class PipelineCacheActionRecord : PipelineTelemetryRecord
     {
         public static string CacheResult { get; private set; }
-        public static string FileCount { get; private set; }
+        public static long FileCount { get; private set; }
         private const string CacheHit = "Hit";
         private const string CacheMiss = "Miss";
         // switch cases must be constant, and switching on type is not supported.
@@ -49,7 +49,7 @@ namespace Agent.Plugins.PipelineCache.Telemetry
                 case PublishResultTypeName:
                     {
                         PublishResult result = value as PublishResult;
-                        FileCount = result.FileCount.ToString();
+                        FileCount = result.FileCount;
                         break;
                     }
                 case CreateStatusTypeName:
