@@ -52,7 +52,7 @@ namespace Agent.Plugins.PipelineArtifact
                     {
                         return await dedupManifestClient.PublishAsync(source, cancellationToken);
                     }
-                ).ConfigureAwait(false);
+                );
                 // Send results to CustomerIntelligence
                 context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineArtifact", record: uploadRecord);
        
@@ -152,7 +152,7 @@ namespace Agent.Plugins.PipelineArtifact
                             actionAsync: async () =>
                             {
                                 await dedupManifestClient.DownloadAsync(options, cancellationToken);
-                            }).ConfigureAwait(false);
+                            });
                         // Send results to CustomerIntelligence
                         context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineArtifact", record: downloadRecord);  
                         }

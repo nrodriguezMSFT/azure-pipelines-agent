@@ -53,7 +53,7 @@ namespace Agent.Plugins.PipelineCache
                     {
                         return await dedupManifestClient.PublishAsync(path, cancellationToken);
                     }
-                ).ConfigureAwait(false);
+                );
 
                 CreatePipelineCacheArtifactOptions options = new CreatePipelineCacheArtifactOptions
                 {
@@ -74,7 +74,7 @@ namespace Agent.Plugins.PipelineCache
                     {
                         return await pipelineCacheClient.CreatePipelineCacheArtifactAsync(options, cancellationToken);
                     }
-                ).ConfigureAwait(false);
+                );
                 // Send results to CustomerIntelligence
                 context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineCache", record: cacheRecord);
                 context.Output("Saved item.");
@@ -110,7 +110,7 @@ namespace Agent.Plugins.PipelineCache
                     {
                         return await pipelineCacheClient.GetPipelineCacheArtifactAsync(options, cancellationToken);
                     }
-                ).ConfigureAwait(false);
+                );
                 // Send results to CustomerIntelligence
                 context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineCache", record: cacheRecord);
                 if (result == null)
@@ -128,7 +128,7 @@ namespace Agent.Plugins.PipelineCache
                         {
                             await this.DownloadPipelineCacheAsync(dedupManifestClient, result.ManifestId, path, cancellationToken);
                         }
-                    ).ConfigureAwait(false);                    
+                    );                    
                     // Send results to CustomerIntelligence
                     context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineCache", record: downloadRecord);
                     if (!string.IsNullOrEmpty(variableToSetOnHit))
