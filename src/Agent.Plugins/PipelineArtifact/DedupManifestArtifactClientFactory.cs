@@ -23,18 +23,6 @@ namespace Agent.Plugins.PipelineArtifact
     {
         private static readonly int DedupStoreClientMaxParallelism = 16 * Environment.ProcessorCount;
 
-        // Use with servers that don't require custom telemetry.
-        public static DedupManifestArtifactClient CreateDedupManifestClient(AgentTaskPluginExecutionContext context, VssConnection connection)
-        {
-            var dedupStoreHttpClient = connection.GetClient<DedupStoreHttpClient>();
-            var tracer = new CallbackAppTraceSource(str => context.Output(str), SourceLevels.Information);
-            dedupStoreHttpClient.SetTracer(tracer);
-            var client = new DedupStoreClientWithDataport(dedupStoreHttpClient, DedupStoreClientMaxParallelism);
-            var telemetry = new BlobStoreClientTelemetry(tracer, dedupStoreHttpClient.BaseAddress);
-            return new DedupManifestArtifactClient(telemetry, client, tracer);
-        }
-
-        // Use with servers that need to interact with the telemetry client.
         public static DedupManifestArtifactClient CreateDedupManifestClient(AgentTaskPluginExecutionContext context, VssConnection connection, out BlobStoreClientTelemetry telemetry)
         {
             var dedupStoreHttpClient = connection.GetClient<DedupStoreHttpClient>();
