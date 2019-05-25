@@ -11,7 +11,7 @@ namespace Agent.Plugins.PipelineArtifact.Telemetry
     /// </summary>
     public class PipelineArtifactActionRecord : PipelineTelemetryRecord
     {
-        public static string FileCount { get; private set; }
+        public static long FileCount { get; private set; }
         private const string PublishResultTypeName = "PublishResult";
 
         public PipelineArtifactActionRecord(TelemetryInformationLevel level, Uri baseAddress, string eventNamePrefix, string eventNameSuffix, AgentTaskPluginExecutionContext context, uint attemptNumber = 1)
@@ -27,7 +27,7 @@ namespace Agent.Plugins.PipelineArtifact.Telemetry
                 case PublishResultTypeName:
                     {
                         PublishResult result = value as PublishResult;
-                        FileCount = result.FileCount.ToString();
+                        FileCount = result.FileCount;
                         break;
                     }
                 default:
