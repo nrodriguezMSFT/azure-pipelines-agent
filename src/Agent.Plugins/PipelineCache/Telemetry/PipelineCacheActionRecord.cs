@@ -15,8 +15,6 @@ namespace Agent.Plugins.PipelineCache.Telemetry
     public class PipelineCacheActionRecord : PipelineCacheTelemetryRecord
     {
         public static long FileCount { get; private set; }
-        // switch cases must be constant, and switching on type is not supported.
-        private const string PublishResultTypeName = "PublishResult";
 
         public PipelineCacheActionRecord(TelemetryInformationLevel level, Uri baseAddress, string eventNamePrefix, string eventNameSuffix, AgentTaskPluginExecutionContext context, uint attemptNumber = 1)
             : base(
@@ -35,7 +33,7 @@ namespace Agent.Plugins.PipelineCache.Telemetry
         {
             string valueType = value.GetType().Name;
 
-            if (valueType == PublishResultTypeName)
+            if (valueType == nameof(PublishResult))
             {
                 PublishResult result = value as PublishResult;
                 FileCount = result.FileCount;
