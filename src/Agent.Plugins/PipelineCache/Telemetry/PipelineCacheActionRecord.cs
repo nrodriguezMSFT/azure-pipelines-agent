@@ -32,7 +32,6 @@ namespace Agent.Plugins.PipelineCache.Telemetry
         protected override void SetMeasuredActionResult<T>(T value)
         {
             string valueType = value.GetType().Name;
-
             if (valueType == nameof(PublishResult))
             {
                 PublishResult result = value as PublishResult;
