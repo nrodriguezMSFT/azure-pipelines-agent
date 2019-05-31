@@ -1,7 +1,7 @@
 using System;
 using Agent.Sdk;
 using Microsoft.VisualStudio.Services.Content.Common.Telemetry;
-using Microsoft.VisualStudio.Services.BlobStore.WebApi.Telemetry;
+using Microsoft.VisualStudio.Services.BlobStore.Common.Telemetry;
 
 namespace Agent.Plugins.PipelineArtifact.Telemetry
 {

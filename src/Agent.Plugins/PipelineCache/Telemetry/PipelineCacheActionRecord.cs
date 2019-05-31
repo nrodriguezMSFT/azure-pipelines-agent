@@ -3,7 +3,7 @@ using Agent.Sdk;
 using Agent.Plugins.PipelineArtifact.Telemetry;
 using Microsoft.VisualStudio.Services.Content.Common.Telemetry;
 using Microsoft.VisualStudio.Services.BlobStore.WebApi;
-using Microsoft.VisualStudio.Services.BlobStore.WebApi.Telemetry;
+using Microsoft.VisualStudio.Services.BlobStore.Common.Telemetry;
 using Microsoft.VisualStudio.Services.PipelineCache.WebApi;
 
 namespace Agent.Plugins.PipelineCache.Telemetry
