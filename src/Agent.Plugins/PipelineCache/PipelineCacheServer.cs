@@ -26,10 +26,11 @@ namespace Agent.Plugins.PipelineCache
     public class PipelineCacheServer
     {
         public const string ProofNodes = "ProofNodes";
-        public const string RestoreCache = "RestoreCache";
         public const string RootId = "RootId";
-        public const string SaveCache = "SaveCache";
-        private const string PipelineCacheVarPrefix = "PipelineCache";
+        private const string AzurePipelinesAgent = "AzurePipelinesAgent";
+        private const string PipelineCache = "PipelineCache";
+        private const string RestoreCache = "RestoreCache";
+        private const string SaveCache = "SaveCache";
 
         internal async Task UploadAsync(
             AgentTaskPluginExecutionContext context,
@@ -41,6 +42,7 @@ namespace Agent.Plugins.PipelineCache
             VssConnection connection = context.VssConnection;
             BlobStoreClientTelemetry clientTelemetry;
             DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection, out clientTelemetry);
+            PipelineCacheClient pipelineCacheClient = this.CreateClient(clientTelemetry, context, connection);
 
             using (clientTelemetry)
             {
@@ -65,18 +67,13 @@ namespace Agent.Plugins.PipelineCache
                 };
 
                 // Cache the artifact
-                PipelineCacheClient pipelineCacheClient = this.CreateClient(context, connection);
                 PipelineCacheActionRecord cacheRecord = clientTelemetry.CreateRecord<PipelineCacheActionRecord>((level, uri, type) =>
                     new PipelineCacheActionRecord(level, uri, type, SaveCache, context));
-                CreateStatus status = await clientTelemetry.MeasureActionAsync(
-                    record: cacheRecord,
-                    actionAsync: async () =>
-                    {
-                        return await pipelineCacheClient.CreatePipelineCacheArtifactAsync(options, cancellationToken);
-                    }
-                );
+                CreateStatus status = await pipelineCacheClient.CreatePipelineCacheArtifactAsync(options, cancellationToken, cacheRecord);
+
                 // Send results to CustomerIntelligence
-                context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineCache", record: cacheRecord);
+                context.PublishTelemetry(area: AzurePipelinesAgent, feature: PipelineCache, record: uploadRecord);
+                context.PublishTelemetry(area: AzurePipelinesAgent, feature: PipelineCache, record: cacheRecord);
                 context.Output("Saved item.");
             }
         }
@@ -92,8 +89,7 @@ namespace Agent.Plugins.PipelineCache
             VssConnection connection = context.VssConnection;
             BlobStoreClientTelemetry clientTelemetry;
             DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection, out clientTelemetry);
-            var pipelineCacheClient = this.CreateClient(context, connection);
-
+            PipelineCacheClient pipelineCacheClient = this.CreateClient(clientTelemetry, context, connection);
             GetPipelineCacheArtifactOptions options = new GetPipelineCacheArtifactOptions
             {
                 Key = key,
@@ -101,18 +97,14 @@ namespace Agent.Plugins.PipelineCache
             };
             
             using (clientTelemetry)
-                {
+            {
                 PipelineCacheActionRecord cacheRecord = clientTelemetry.CreateRecord<PipelineCacheActionRecord>((level, uri, type) =>
                         new PipelineCacheActionRecord(level, uri, type, RestoreCache, context));
-                PipelineCacheArtifact result = await clientTelemetry.MeasureActionAsync(
-                    record: cacheRecord,
-                    actionAsync: async () =>
-                    {
-                        return await pipelineCacheClient.GetPipelineCacheArtifactAsync(options, cancellationToken);
-                    }
-                );
+                PipelineCacheArtifact result = await pipelineCacheClient.GetPipelineCacheArtifactAsync(options, cancellationToken, cacheRecord);
+                
                 // Send results to CustomerIntelligence
-                context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineCache", record: cacheRecord);
+                context.PublishTelemetry(area: AzurePipelinesAgent, feature: PipelineCache, record: cacheRecord);
+                
                 if (result == null)
                 {
                     return;
@@ -128,12 +120,14 @@ namespace Agent.Plugins.PipelineCache
                         {
                             await this.DownloadPipelineCacheAsync(dedupManifestClient, result.ManifestId, path, cancellationToken);
                         }
-                    );                    
+                    );
+
                     // Send results to CustomerIntelligence
-                    context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineCache", record: downloadRecord);
+                    context.PublishTelemetry(area: AzurePipelinesAgent, feature: PipelineCache, record: downloadRecord);
+                    
                     if (!string.IsNullOrEmpty(variableToSetOnHit))
                     {
-                        context.SetVariable($"{PipelineCacheVarPrefix}.{variableToSetOnHit}", "True");
+                        context.SetVariable($"{PipelineCache}.{variableToSetOnHit}", "True");
                     }
                     Console.WriteLine("Cache restored.");
                 }
@@ -141,13 +135,14 @@ namespace Agent.Plugins.PipelineCache
         }
 
         private PipelineCacheClient CreateClient(
+            BlobStoreClientTelemetry blobStoreClientTelemetry,
             AgentTaskPluginExecutionContext context,
             VssConnection connection)
         {
             var tracer = new CallbackAppTraceSource(str => context.Output(str), System.Diagnostics.SourceLevels.Information);
             IClock clock = UtcClock.Instance;           
             var pipelineCacheHttpClient = connection.GetClient<PipelineCacheHttpClient>();
-            var pipelineCacheClient = new PipelineCacheClient(pipelineCacheHttpClient, clock, tracer);
+            var pipelineCacheClient = new PipelineCacheClient(blobStoreClientTelemetry, pipelineCacheHttpClient, clock, tracer);
 
             return pipelineCacheClient;
         }
