@@ -18,21 +18,20 @@ namespace Agent.Plugins.PipelineCache.Telemetry
 
         public PipelineCacheActionRecord(TelemetryInformationLevel level, Uri baseAddress, string eventNamePrefix, string eventNameSuffix, AgentTaskPluginExecutionContext context, uint attemptNumber = 1)
             : base(
-            level: level, 
-            baseAddress: baseAddress, 
-            eventNamePrefix: eventNamePrefix, 
-            eventNameSuffix: eventNameSuffix, 
-            planId: Guid.Parse(context.Variables["system.planId"].Value), 
-            jobId: Guid.Parse(context.Variables["system.jobId"].Value), 
-            taskInstanceId: Guid.Parse(context.Variables["system.taskInstanceId"].Value), 
+            level: level,
+            baseAddress: baseAddress,
+            eventNamePrefix: eventNamePrefix,
+            eventNameSuffix: eventNameSuffix,
+            planId: Guid.Parse(context.Variables["system.planId"].Value),
+            jobId: Guid.Parse(context.Variables["system.jobId"].Value),
+            taskInstanceId: Guid.Parse(context.Variables["system.taskInstanceId"].Value),
             attemptNumber: attemptNumber)
         {
         }
 
         protected override void SetMeasuredActionResult<T>(T value)
         {
-            string valueType = value.GetType().Name;
-            if (valueType == nameof(PublishResult))
+            if (value is PublishResult)
             {
                 PublishResult result = value as PublishResult;
                 FileCount = result.FileCount;

@@ -40,7 +40,7 @@ namespace Agent.Plugins.PipelineArtifact
             VssConnection connection = context.VssConnection;
             BlobStoreClientTelemetry clientTelemetry;
             DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection, out clientTelemetry);
-            
+
             using (clientTelemetry)
             {
                 //Upload the pipeline artifact.
@@ -55,7 +55,7 @@ namespace Agent.Plugins.PipelineArtifact
                 );
                 // Send results to CustomerIntelligence
                 context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineArtifact", record: uploadRecord);
-       
+
                 // 2) associate the pipeline artifact with an build artifact
                 BuildServer buildHelper = new BuildServer(connection);
                 Dictionary<string, string> propertiesDictionary = new Dictionary<string, string>();
@@ -99,7 +99,7 @@ namespace Agent.Plugins.PipelineArtifact
             BlobStoreClientTelemetry clientTelemetry;
             DedupManifestArtifactClient dedupManifestClient = DedupManifestArtifactClientFactory.CreateDedupManifestClient(context, connection, out clientTelemetry);
             BuildServer buildHelper = new BuildServer(connection);
-            
+
             using (clientTelemetry)
             {
                 // download all pipeline artifacts if artifact name is missing
@@ -123,7 +123,7 @@ namespace Agent.Plugins.PipelineArtifact
                     }
                     else
                     {
-                        throw new InvalidOperationException("Unreachable code!");
+                        throw new InvalidOperationException("Invalid downloadParameters.ProjectRetrievalOptions!");
                     }
 
                     IEnumerable<BuildArtifact> pipelineArtifacts = artifacts.Where(a => a.Resource.Type == PipelineArtifactTypeName);
@@ -154,7 +154,7 @@ namespace Agent.Plugins.PipelineArtifact
                                 await dedupManifestClient.DownloadAsync(options, cancellationToken);
                             });
                         // Send results to CustomerIntelligence
-                        context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineArtifact", record: downloadRecord);  
+                        context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineArtifact", record: downloadRecord);
                         }
                 }
                 else if (downloadOptions == DownloadOptions.SingleDownload)
@@ -178,7 +178,7 @@ namespace Agent.Plugins.PipelineArtifact
                     }
                     else
                     {
-                        throw new InvalidOperationException("Unreachable code!");
+                        throw new InvalidOperationException("Invalid downloadParameters.ProjectRetrievalOptions!");
                     }
 
                     var manifestId = DedupIdentifier.Create(buildArtifact.Resource.Data);
@@ -187,21 +187,21 @@ namespace Agent.Plugins.PipelineArtifact
                         downloadParameters.TargetDirectory,
                         proxyUri: null,
                         minimatchPatterns: downloadParameters.MinimatchFilters);
-                    
+
                     PipelineArtifactActionRecord downloadRecord = clientTelemetry.CreateRecord<PipelineArtifactActionRecord>((level, uri, type) =>
                             new PipelineArtifactActionRecord(level, uri, type, nameof(DownloadAsync), context));
                     await clientTelemetry.MeasureActionAsync(
                         record: downloadRecord,
                         actionAsync: async () =>
                         {
-                            await dedupManifestClient.DownloadAsync(options, cancellationToken);                            
+                            await dedupManifestClient.DownloadAsync(options, cancellationToken);
                         });
                     // Send results to CustomerIntelligence
-                    context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineArtifact", record: downloadRecord);  
+                    context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineArtifact", record: downloadRecord);
                 }
                 else
                 {
-                    throw new InvalidOperationException("Unreachable code!");
+                    throw new InvalidOperationException("Invalid downloadOptions!");
                 }
             }
         }
@@ -237,7 +237,7 @@ namespace Agent.Plugins.PipelineArtifact
                 }
                 else
                 {
-                    throw new InvalidOperationException("Unreachable code!");
+                    throw new InvalidOperationException("Invalid downloadParameters.ProjectRetrievalOptions!");
                 }
 
                 IEnumerable<BuildArtifact> buildArtifacts = artifacts.Where(a => a.Resource.Type == BuildArtifactTypeName);
@@ -275,7 +275,7 @@ namespace Agent.Plugins.PipelineArtifact
                 }
                 else
                 {
-                    throw new InvalidOperationException("Unreachable code!");
+                    throw new InvalidOperationException("Invalid downloadParameters.ProjectRetrievalOptions!");
                 }
 
                 ArtifactProviderFactory factory = new ArtifactProviderFactory(context, connection, this.CreateTracer(context));
@@ -284,7 +284,7 @@ namespace Agent.Plugins.PipelineArtifact
             }
             else
             {
-                throw new InvalidOperationException("Unreachable code!");
+                throw new InvalidOperationException("Invalid downloadOptions!");
             }
         }
 

@@ -20,8 +20,7 @@ namespace Agent.Plugins.PipelineArtifact.Telemetry
 
         protected override void SetMeasuredActionResult<T>(T value)
         {
-            string valueType = value.GetType().ToString();
-            if (valueType == nameof(PublishResult))
+            if (value is PublishResult)
             {
                 PublishResult result = value as PublishResult;
                 FileCount = result.FileCount;

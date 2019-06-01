@@ -22,7 +22,7 @@ using Microsoft.VisualStudio.Services.WebApi;
 using Newtonsoft.Json;
 
 namespace Agent.Plugins.PipelineCache
-{    
+{
     public class PipelineCacheServer
     {
         public const string ProofNodes = "ProofNodes";
@@ -54,8 +54,7 @@ namespace Agent.Plugins.PipelineCache
                     actionAsync: async () =>
                     {
                         return await dedupManifestClient.PublishAsync(path, cancellationToken);
-                    }
-                );
+                    });
 
                 CreatePipelineCacheArtifactOptions options = new CreatePipelineCacheArtifactOptions
                 {
@@ -101,10 +100,10 @@ namespace Agent.Plugins.PipelineCache
                 PipelineCacheActionRecord cacheRecord = clientTelemetry.CreateRecord<PipelineCacheActionRecord>((level, uri, type) =>
                         new PipelineCacheActionRecord(level, uri, type, RestoreCache, context));
                 PipelineCacheArtifact result = await pipelineCacheClient.GetPipelineCacheArtifactAsync(options, cancellationToken, cacheRecord);
-                
+
                 // Send results to CustomerIntelligence
                 context.PublishTelemetry(area: AzurePipelinesAgent, feature: PipelineCache, record: cacheRecord);
-                
+
                 if (result == null)
                 {
                     return;
@@ -119,8 +118,7 @@ namespace Agent.Plugins.PipelineCache
                         actionAsync: async () =>
                         {
                             await this.DownloadPipelineCacheAsync(dedupManifestClient, result.ManifestId, path, cancellationToken);
-                        }
-                    );
+                        });
 
                     // Send results to CustomerIntelligence
                     context.PublishTelemetry(area: AzurePipelinesAgent, feature: PipelineCache, record: downloadRecord);
@@ -140,7 +138,7 @@ namespace Agent.Plugins.PipelineCache
             VssConnection connection)
         {
             var tracer = new CallbackAppTraceSource(str => context.Output(str), System.Diagnostics.SourceLevels.Information);
-            IClock clock = UtcClock.Instance;           
+            IClock clock = UtcClock.Instance;
             var pipelineCacheHttpClient = connection.GetClient<PipelineCacheHttpClient>();
             var pipelineCacheClient = new PipelineCacheClient(blobStoreClientTelemetry, pipelineCacheHttpClient, clock, tracer);
 

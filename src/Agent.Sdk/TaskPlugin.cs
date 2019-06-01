@@ -164,16 +164,13 @@ namespace Agent.Sdk
         }
 
         public void PublishTelemetry(string area, string feature, Dictionary<string, string> properties)
-        {      
+        {
             string propertiesAsJson = StringUtil.ConvertToJson(properties, Formatting.None);
             Output($"##vso[telemetry.publish area={area};feature={feature}]{Escape(propertiesAsJson)}");
         }
 
-        public void PublishTelemetry(string area, string feature, TelemetryRecord record)
-        {            
-            Dictionary<string, string> trimmedRecord = record.GetAssignedProperties();
-            PublishTelemetry(area, feature, trimmedRecord);
-        }
+        public void PublishTelemetry(string area, string feature, TelemetryRecord record) 
+            => PublishTelemetry(area, feature, record.GetAssignedProperties());
 
         public void Output(string message)
         {

@@ -28,9 +28,8 @@ namespace Agent.Plugins.PipelineArtifact
             var dedupStoreHttpClient = connection.GetClient<DedupStoreHttpClient>();
             var tracer = new CallbackAppTraceSource(str => context.Output(str), SourceLevels.Information);
             dedupStoreHttpClient.SetTracer(tracer);
-            var client = new DedupStoreClientWithDataport(dedupStoreHttpClient, DedupStoreClientMaxParallelism);
-            telemetry = new BlobStoreClientTelemetry(tracer, dedupStoreHttpClient.BaseAddress);
-            return new DedupManifestArtifactClient(telemetry, client, tracer);
+            var client = new DedupStoreClientWithDataport(dedupStoreHttpClient, DedupStoreClientMaxParallelism);            
+            return new DedupManifestArtifactClient(telemetry = new BlobStoreClientTelemetry(tracer, dedupStoreHttpClient.BaseAddress), client, tracer);
         }
     }
 }
