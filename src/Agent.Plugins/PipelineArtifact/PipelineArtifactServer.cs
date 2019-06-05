@@ -23,11 +23,6 @@ namespace Agent.Plugins.PipelineArtifact
     // A wrapper of DedupManifestArtifactClient, providing basic functionalities such as uploading and downloading pipeline artifacts.
     public class PipelineArtifactServer
     {
-        public static readonly string RootId = "RootId";
-        public static readonly string ProofNodes = "ProofNodes";
-        public const string PipelineArtifactTypeName = "PipelineArtifact";
-        public const string BuildArtifactTypeName = "Container";
-
         // Upload from target path to Azure DevOps BlobStore service through DedupManifestArtifactClient, then associate it with the build
         internal async Task UploadAsync(
             AgentTaskPluginExecutionContext context,
@@ -54,13 +49,13 @@ namespace Agent.Plugins.PipelineArtifact
                     }
                 );
                 // Send results to CustomerIntelligence
-                context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineArtifact", record: uploadRecord);
+                context.PublishTelemetry(area: PipelineArtifactConstants.AzurePipelinesAgent, feature: PipelineArtifactConstants.PipelineArtifact, record: uploadRecord);
 
                 // 2) associate the pipeline artifact with an build artifact
                 BuildServer buildHelper = new BuildServer(connection);
                 Dictionary<string, string> propertiesDictionary = new Dictionary<string, string>();
-                propertiesDictionary.Add(RootId, result.RootId.ValueString);
-                propertiesDictionary.Add(ProofNodes, StringUtil.ConvertToJson(result.ProofNodes.ToArray()));
+                propertiesDictionary.Add(PipelineArtifactConstants.RootId, result.RootId.ValueString);
+                propertiesDictionary.Add(PipelineArtifactConstants.ProofNodes, StringUtil.ConvertToJson(result.ProofNodes.ToArray()));
                 var artifact = await buildHelper.AssociateArtifact(projectId, pipelineId, name, ArtifactResourceTypes.PipelineArtifact, result.ManifestId.ValueString, propertiesDictionary, cancellationToken);
                 context.Output(StringUtil.Loc("AssociateArtifactWithBuild", artifact.Id, pipelineId));
             }
@@ -126,7 +121,7 @@ namespace Agent.Plugins.PipelineArtifact
                         throw new InvalidOperationException($"Invalid {nameof(downloadParameters.ProjectRetrievalOptions)}!");
                     }
 
-                    IEnumerable<BuildArtifact> pipelineArtifacts = artifacts.Where(a => a.Resource.Type == PipelineArtifactTypeName);
+                    IEnumerable<BuildArtifact> pipelineArtifacts = artifacts.Where(a => a.Resource.Type == PipelineArtifactConstants.PipelineArtifact);
                     if (pipelineArtifacts.Count() == 0)
                     {
                         throw new ArgumentException("Could not find any pipeline artifacts in the build.");
@@ -154,7 +149,7 @@ namespace Agent.Plugins.PipelineArtifact
                                 await dedupManifestClient.DownloadAsync(options, cancellationToken);
                             });
                         // Send results to CustomerIntelligence
-                        context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineArtifact", record: downloadRecord);
+                        context.PublishTelemetry(area: PipelineArtifactConstants.AzurePipelinesAgent, feature: PipelineArtifactConstants.PipelineArtifact, record: downloadRecord);
                         }
                 }
                 else if (downloadOptions == DownloadOptions.SingleDownload)
@@ -197,7 +192,7 @@ namespace Agent.Plugins.PipelineArtifact
                             await dedupManifestClient.DownloadAsync(options, cancellationToken);
                         });
                     // Send results to CustomerIntelligence
-                    context.PublishTelemetry(area: "AzurePipelinesAgent", feature: "PipelineArtifact", record: downloadRecord);
+                    context.PublishTelemetry(area: PipelineArtifactConstants.AzurePipelinesAgent, feature: PipelineArtifactConstants.PipelineArtifact, record: downloadRecord);
                 }
                 else
                 {
@@ -240,8 +235,8 @@ namespace Agent.Plugins.PipelineArtifact
                     throw new InvalidOperationException($"Invalid {nameof(downloadParameters.ProjectRetrievalOptions)}!");
                 }
 
-                IEnumerable<BuildArtifact> buildArtifacts = artifacts.Where(a => a.Resource.Type == BuildArtifactTypeName);
-                IEnumerable<BuildArtifact> pipelineArtifacts = artifacts.Where(a => a.Resource.Type == PipelineArtifactTypeName);
+                IEnumerable<BuildArtifact> buildArtifacts = artifacts.Where(a => a.Resource.Type == PipelineArtifactConstants.Container);
+                IEnumerable<BuildArtifact> pipelineArtifacts = artifacts.Where(a => a.Resource.Type == PipelineArtifactConstants.PipelineArtifact);
                 if (buildArtifacts.Any())
                 {
                     FileContainerProvider provider = new FileContainerProvider(connection, this.CreateTracer(context));

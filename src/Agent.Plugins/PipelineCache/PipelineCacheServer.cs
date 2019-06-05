@@ -25,13 +25,6 @@ namespace Agent.Plugins.PipelineCache
 {
     public class PipelineCacheServer
     {
-        public const string ProofNodes = "ProofNodes";
-        public const string RootId = "RootId";
-        private const string AzurePipelinesAgent = "AzurePipelinesAgent";
-        private const string PipelineCache = "PipelineCache";
-        private const string RestoreCache = "RestoreCache";
-        private const string SaveCache = "SaveCache";
-
         internal async Task UploadAsync(
             AgentTaskPluginExecutionContext context,
             IEnumerable<string> key,
@@ -67,12 +60,12 @@ namespace Agent.Plugins.PipelineCache
 
                 // Cache the artifact
                 PipelineCacheActionRecord cacheRecord = clientTelemetry.CreateRecord<PipelineCacheActionRecord>((level, uri, type) =>
-                    new PipelineCacheActionRecord(level, uri, type, SaveCache, context));
+                    new PipelineCacheActionRecord(level, uri, type, PipelineArtifactConstants.SaveCache, context));
                 CreateStatus status = await pipelineCacheClient.CreatePipelineCacheArtifactAsync(options, cancellationToken, cacheRecord);
 
                 // Send results to CustomerIntelligence
-                context.PublishTelemetry(area: AzurePipelinesAgent, feature: PipelineCache, record: uploadRecord);
-                context.PublishTelemetry(area: AzurePipelinesAgent, feature: PipelineCache, record: cacheRecord);
+                context.PublishTelemetry(area: PipelineArtifactConstants.AzurePipelinesAgent, feature: PipelineArtifactConstants.PipelineCache, record: uploadRecord);
+                context.PublishTelemetry(area: PipelineArtifactConstants.AzurePipelinesAgent, feature: PipelineArtifactConstants.PipelineCache, record: cacheRecord);
                 context.Output("Saved item.");
             }
         }
@@ -98,11 +91,11 @@ namespace Agent.Plugins.PipelineCache
             using (clientTelemetry)
             {
                 PipelineCacheActionRecord cacheRecord = clientTelemetry.CreateRecord<PipelineCacheActionRecord>((level, uri, type) =>
-                        new PipelineCacheActionRecord(level, uri, type, RestoreCache, context));
+                        new PipelineCacheActionRecord(level, uri, type, PipelineArtifactConstants.RestoreCache, context));
                 PipelineCacheArtifact result = await pipelineCacheClient.GetPipelineCacheArtifactAsync(options, cancellationToken, cacheRecord);
 
                 // Send results to CustomerIntelligence
-                context.PublishTelemetry(area: AzurePipelinesAgent, feature: PipelineCache, record: cacheRecord);
+                context.PublishTelemetry(area: PipelineArtifactConstants.AzurePipelinesAgent, feature: PipelineArtifactConstants.PipelineCache, record: cacheRecord);
 
                 if (result == null)
                 {
@@ -121,11 +114,11 @@ namespace Agent.Plugins.PipelineCache
                         });
 
                     // Send results to CustomerIntelligence
-                    context.PublishTelemetry(area: AzurePipelinesAgent, feature: PipelineCache, record: downloadRecord);
+                    context.PublishTelemetry(area: PipelineArtifactConstants.AzurePipelinesAgent, feature: PipelineArtifactConstants.PipelineCache, record: downloadRecord);
                     
                     if (!string.IsNullOrEmpty(variableToSetOnHit))
                     {
-                        context.SetVariable($"{PipelineCache}.{variableToSetOnHit}", "True");
+                        context.SetVariable($"{PipelineArtifactConstants.PipelineCache}.{variableToSetOnHit}", "True");
                     }
                     Console.WriteLine("Cache restored.");
                 }
