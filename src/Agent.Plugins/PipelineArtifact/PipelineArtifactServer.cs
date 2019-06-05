@@ -123,7 +123,7 @@ namespace Agent.Plugins.PipelineArtifact
                     }
                     else
                     {
-                        throw new InvalidOperationException("Invalid downloadParameters.ProjectRetrievalOptions!");
+                        throw new InvalidOperationException($"Invalid {nameof(downloadParameters.ProjectRetrievalOptions)}!");
                     }
 
                     IEnumerable<BuildArtifact> pipelineArtifacts = artifacts.Where(a => a.Resource.Type == PipelineArtifactTypeName);
@@ -178,7 +178,7 @@ namespace Agent.Plugins.PipelineArtifact
                     }
                     else
                     {
-                        throw new InvalidOperationException("Invalid downloadParameters.ProjectRetrievalOptions!");
+                        throw new InvalidOperationException($"Invalid {nameof(downloadParameters.ProjectRetrievalOptions)}!");
                     }
 
                     var manifestId = DedupIdentifier.Create(buildArtifact.Resource.Data);
@@ -201,7 +201,7 @@ namespace Agent.Plugins.PipelineArtifact
                 }
                 else
                 {
-                    throw new InvalidOperationException("Invalid downloadOptions!");
+                    throw new InvalidOperationException($"Invalid {nameof(downloadOptions)}!");
                 }
             }
         }
@@ -237,7 +237,7 @@ namespace Agent.Plugins.PipelineArtifact
                 }
                 else
                 {
-                    throw new InvalidOperationException("Invalid downloadParameters.ProjectRetrievalOptions!");
+                    throw new InvalidOperationException($"Invalid {nameof(downloadParameters.ProjectRetrievalOptions)}!");
                 }
 
                 IEnumerable<BuildArtifact> buildArtifacts = artifacts.Where(a => a.Resource.Type == BuildArtifactTypeName);
@@ -275,7 +275,7 @@ namespace Agent.Plugins.PipelineArtifact
                 }
                 else
                 {
-                    throw new InvalidOperationException("Invalid downloadParameters.ProjectRetrievalOptions!");
+                    throw new InvalidOperationException($"Invalid {nameof(downloadParameters.ProjectRetrievalOptions)}!");
                 }
 
                 ArtifactProviderFactory factory = new ArtifactProviderFactory(context, connection, this.CreateTracer(context));
@@ -284,7 +284,7 @@ namespace Agent.Plugins.PipelineArtifact
             }
             else
             {
-                throw new InvalidOperationException("Invalid downloadOptions!");
+                throw new InvalidOperationException($"Invalid {nameof(downloadOptions)}!");
             }
         }
 
