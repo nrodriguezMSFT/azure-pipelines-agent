@@ -20,8 +20,9 @@ namespace Agent.Plugins.PipelineArtifact
     public abstract class PipelineArtifactTaskPluginBaseV2 : IAgentTaskPlugin
     {
         public abstract Guid Id { get; }
-        protected virtual string DownloadPath => "downloadPath";
-        protected virtual string BuildId => "buildId";
+        protected virtual string DownloadPath => "path";
+        protected virtual string pipelineRunId => "runId";
+
         public string Stage => "main";
 
         public Task RunAsync(AgentTaskPluginExecutionContext context, CancellationToken token)
@@ -38,7 +39,7 @@ namespace Agent.Plugins.PipelineArtifact
         {
             public static readonly string BuildType = "buildType";
             public static readonly string Project = "project";
-            public static readonly string BuildPipelineDefinition = "definition";
+            public static readonly string PipelineDefinition = "pipeline";
             public static readonly string BuildTriggering = "specificBuildWithTriggering";
             public static readonly string BuildVersionToDownload = "buildVersionToDownload";
             public static readonly string BranchName = "branchName";
@@ -66,7 +67,7 @@ namespace Agent.Plugins.PipelineArtifact
             ArgUtil.NotNull(context, nameof(context));
             string artifactName = context.GetInput(ArtifactEventProperties.ArtifactName, required: false);
             string branchName = context.GetInput(ArtifactEventProperties.BranchName, required: false);
-            string buildPipelineDefinition = context.GetInput(ArtifactEventProperties.BuildPipelineDefinition, required: false);
+            string pipelineDefinition = context.GetInput(ArtifactEventProperties.PipelineDefinition, required: false);
             string buildType = context.GetInput(ArtifactEventProperties.BuildType, required: true);
             string buildTriggering = context.GetInput(ArtifactEventProperties.BuildTriggering, required: false);
             string buildVersionToDownload = context.GetInput(ArtifactEventProperties.BuildVersionToDownload, required: false);
@@ -75,7 +76,14 @@ namespace Agent.Plugins.PipelineArtifact
             string itemPattern = context.GetInput(ArtifactEventProperties.ItemPattern, required: false);
             string projectName = context.GetInput(ArtifactEventProperties.Project, required: false);
             string tags = context.GetInput(ArtifactEventProperties.Tags, required: false);
-            string userSpecifiedpipelineId = context.GetInput(BuildId, required: false);
+            string userSpecifiedpipelineId = context.GetInput(pipelineRunId, required: false);
+            string defaultWorkingDirectory = context.Variables.GetValueOrDefault("system.defaultworkingdirectory").Value;
+
+            targetPath = Path.IsPathFullyQualified(targetPath) ? targetPath : Path.GetFullPath(Path.Combine(defaultWorkingDirectory, targetPath));
+            
+            if(!PipelineArtifactPathHelper.IsValidArtifactName(artifactName)) {
+                throw new ArgumentException(StringUtil.Loc("ArtifactNameIsNotValid", artifactName));
+            }
 
             string[] minimatchPatterns = itemPattern.Split(
                 new[] { "\n" },
@@ -132,7 +140,8 @@ namespace Agent.Plugins.PipelineArtifact
                     PipelineId = pipelineId,
                     ArtifactName = artifactName,
                     TargetDirectory = targetPath,
-                    MinimatchFilters = minimatchPatterns
+                    MinimatchFilters = minimatchPatterns,
+                    MinimatchFilterWithArtifactName = true
                 };
             }
             else if (buildType == buildTypeSpecific)
@@ -145,7 +154,7 @@ namespace Agent.Plugins.PipelineArtifact
                 int pipelineId;
                 if (buildVersionToDownload == buildVersionToDownloadLatest)
                 {
-                    pipelineId = await this.GetPipelineIdAsync(context, buildPipelineDefinition, buildVersionToDownload, projectName, tagsInput);
+                    pipelineId = await this.GetPipelineIdAsync(context, pipelineDefinition, buildVersionToDownload, projectName, tagsInput);
                 }
                 else if (buildVersionToDownload == buildVersionToDownloadSpecific)
                 {
@@ -153,7 +162,7 @@ namespace Agent.Plugins.PipelineArtifact
                 }
                 else if (buildVersionToDownload == buildVersionToDownloadLatestFromBranch)
                 {
-                    pipelineId = await this.GetPipelineIdAsync(context, buildPipelineDefinition, buildVersionToDownload, projectName, tagsInput, branchName);
+                    pipelineId = await this.GetPipelineIdAsync(context, pipelineDefinition, buildVersionToDownload, projectName, tagsInput, branchName);
                 }
                 else
                 {
@@ -167,7 +176,8 @@ namespace Agent.Plugins.PipelineArtifact
                     PipelineId = pipelineId,
                     ArtifactName = artifactName,
                     TargetDirectory = targetPath,
-                    MinimatchFilters = minimatchPatterns
+                    MinimatchFilters = minimatchPatterns,
+                    MinimatchFilterWithArtifactName = true
                 };
             }
             else
@@ -208,9 +218,9 @@ namespace Agent.Plugins.PipelineArtifact
             return fullPath;
         }
 
-        private async Task<int> GetPipelineIdAsync(AgentTaskPluginExecutionContext context, string buildPipelineDefinition, string buildVersionToDownload, string project, string[] tagFilters, string branchName = null)
+        private async Task<int> GetPipelineIdAsync(AgentTaskPluginExecutionContext context, string pipelineDefinition, string buildVersionToDownload, string project, string[] tagFilters, string branchName = null)
         {
-            var definitions = new List<int>() { Int32.Parse(buildPipelineDefinition) };
+            var definitions = new List<int>() { Int32.Parse(pipelineDefinition) };
             VssConnection connection = context.VssConnection;
             BuildHttpClient buildHttpClient = connection.GetClient<BuildHttpClient>();
             List<Build> list;
